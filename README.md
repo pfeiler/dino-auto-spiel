@@ -27,14 +27,14 @@ Die nächste Welt öffnet sich, sobald du in der Welt davor **90 % der Höchstpu
 
 | Welt | Höchstpunkte | 90 % nötig für die nächste Welt |
 |---|---|---|
-| 1 Abenteuer-Land | 18.500 | 16.650 |
+| 1 Abenteuer-Land | 27.600 | 24.840 |
 | 2 Eiswelt | 21.400 | 19.260 |
 | 3 Dschungelwelt | 23.100 | 20.790 |
 | 4 Chemiewelt | 24.000 | 21.600 |
 | 5 Elektrowelt | 25.000 | – |
 
 Die Höchstpunkte entsprechen einer fehlerfreien, schnellen Fahrt (alle Hindernisse, alle Feuer gelöscht, Boss besiegt, kein Unfall).
-Mit einem kleinen Fehler und etwas Zögern schafft man die 90 % trotzdem. Bestwerte je Welt werden im Browser gespeichert.
+Mit einem kleinen Fehler und etwas Zögern schafft man die 90 % trotzdem. Bestwerte je Welt werden im Browser gespeichert. Eine einmal freigeschaltete Welt bleibt freigeschaltet.
 
 ## Punkte
 Strecke, geschaffte Hindernisse (+50), Sprünge (je länger in der Luft, desto mehr), gelöschte Feuer (+100),

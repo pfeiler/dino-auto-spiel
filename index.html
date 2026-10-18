@@ -340,7 +340,20 @@ const BOSS_T={
  robot:{label:'⚡ Blitz-Robo',hp:400,base:1.4,vary:1.0,T:1.7,mouth:[-150,-215],proj:'bolt',patch:'elec',hint:'⚡ Blitz-Robo! WASSER 💧 gibt ihm einen Kurzschluss!',defeat:'Kurzschluss! ⚡',win:'Blitz-Robo hat einen Kurzschluss!',done:'Blitz-Robo ist aus! Fahr ins Ziel! 🏁'}};
 // Maximalpunkte je Welt = bester Lauf des Computer-Fahrers (alle 5 Level, alle Hindernisse, alle Feuer, Boss, kein Unfall, Bestzeit),
 // gemessen mit test/maxcalc.js (4 Wiederholungen x 4 Fahrzeuge): schlechtester der 4 perfekten Läufe des besten Fahrzeugs, auf volle 100 abgerundet. 90 % davon schalten die nächste Welt frei.
-const WORLD_MAX=[18500,21400,23100,24000,25000];
+/* Welt 1: ursprüngliche Rampen-Lage aus der alten Zufallsfolge (reine Berechnung, ohne Gelände) */
+function w1LegacyRamps(L,i){const rng=mulberry32(4242+i*977);rng();rng();const total=L.len+2500,reserved=[];const res=(a,b)=>reserved.push([a,b]);const free=(a,b)=>reserved.every(r=>b<r[0]||a>r[1]);
+  res(0,700);L.fires.forEach(f=>{const x=Math.round(L.len*f.at);res(x-650,x+300);});const cps=[0,Math.round(L.len/3),Math.round(L.len*2/3)];
+  if(L.boss){cps.push(L.len-1900);res(L.len-2100,total);}cps.forEach(c=>{if(c>0)res(c-220,c+260);});res(L.len-300,total);
+  const out=[];let guard=0;while(out.length<L.ramps&&guard++<500){const x=Math.round(800+rng()*(L.len-1800));const len=240+rng()*80,ht=70+rng()*50;
+    if(!free(x-150,x+len+520))continue;res(x-150,x+len+520);out.push({f:x/L.len,len,ht});}return out;}
+/* freie Strecken für Hindernisse in Welt 1: Abstand zu Start, Feuern, Checkpoints, Rampen (inkl. Landezone) und Ziel/Boss wie in den neuen Welten */
+function w1Segs(L){const len=L.len,total=len+2500;const fx=[[0,800]];L.fires.forEach(f=>{const x=Math.round(len*f.at);fx.push([x-420,x+200]);});
+  const cps=[Math.round(len/3),Math.round(len*2/3)];if(L.boss)cps.push(len-1900);cps.forEach(c=>fx.push([c-120,c+240]));
+  L.ramps0.forEach(r=>{const x=Math.round(r.f*len);fx.push([x-100,x+r.len+650]);});fx.push(L.boss?[len-2100,total]:[len-400,total]);
+  fx.sort((a,b)=>a[0]-b[0]);const segs=[];let cur=0;for(const [a,b] of fx){if(a>cur)segs.push([cur,a]);cur=Math.max(cur,b);}return segs;}
+function w1Fits(L){const segs=w1Segs(L),load=segs.map(()=>0);for(let k=0;k<L.obst;k++){let bi=-1,br=-1;segs.forEach((g,j)=>{const room=g[1]-g[0]-load[j]-520;if(room>=0&&room>br){br=room;bi=j;}});if(bi<0)return false;load[bi]+=520;}return true;}
+WORLDS[0].levels.forEach((L,i)=>{L.len0=L.len;L.ramps0=w1LegacyRamps(L,i);while(!w1Fits(L))L.len+=100;L.len+=200;/* +200 m Luft, damit es nicht eng wird */});
+const WORLD_MAX=[27600,21400,23100,24000,25000];
 const UNLOCK_PCT=0.9;
 const LS_BEST='dinoAutoSpiel.worldBest.v1', LS_MUSIC='dinoAutoSpiel.music';
 const BASE=430, G=1800, WG=700, WSPEED=950;
@@ -377,23 +390,20 @@ function buildLevel(w,i){lvlPlanInfo=null;
   res(L.len-300,total);
   const ramps=[],zones=[],lasers=[],obstacles=[];
   if(w===0){
-  let guard=0;
-  while(ramps.length<L.ramps&&guard++<500){const x=Math.round(800+rng()*(L.len-1800));const len=240+rng()*80,ht=70+rng()*50;
-    if(!free(x-SZ.r[0],x+len+SZ.r[1]))continue;res(x-SZ.r[0],x+len+SZ.r[1]);hardRes.push([x-SZ.r[0],x+len+120]);flatten(x-80,x+len+40,140);
+  /* Welt 1: Rampen wie bisher (gleiche Zufallsfolge, gleiche relative Lage), Hindernisse jetzt mit dem Planer der neuen Welten */
+  for(const r of L.ramps0){const x=Math.round(r.f*L.len),len=r.len,ht=r.ht;flatten(x-80,x+len+40,140);
     const k0=Math.round(x/10),k1=Math.round((x+len)/10);for(let k=k0;k<=k1;k++)h[k]+=ht*((k-k0)/(k1-k0));for(let k=k1+1;k<=k1+3;k++)h[k]+=ht*(1-(k-k1)/3);
-    ramps.push({x,len,ht});}
-  const r2=mulberry32(99+w*31+i*7);
-  for(let n=0,g=0;n<(L.lasers||0)&&g<600;g++){const x=Math.round(900+r2()*(L.len-1800));if(!free(x-300,x+300))continue;res(x-300,x+300);hardRes.push([x-300,x+300]);flatten(x-90,x+90,120);
-    lasers.push({x,period:3.2,on:1.3,phase:r2()*3.2,hinted:false});n++;}
-  guard=0;
-  while(obstacles.length<L.obst&&guard++<2000){const x=Math.round(800+rng()*(L.len-1100));if(!free(x-SZ.o,x+SZ.o))continue;res(x-SZ.o,x+SZ.o);flatten(x-70,x+70,120);
-    const OL=WD.obst;const T=OL[Math.floor(rng()*OL.length)];const big=(w===0?i>=2&&rng()<0.4:(i>=2||w>=3)&&rng()<0.22+0.04*w)&&!T.flat?1.2:1;obstacles.push({x,t:T.t,w:T.w*big,h:T.h*big,flat:!!T.flat,passed:false});}
+    ramps.push({x,len,ht});hardRes.push([x-100,x+len+650]);}
+  const r2=mulberry32(99+i*7);const segs=w1Segs(L);
+  const load=segs.map(()=>0),cnt=segs.map(()=>0),dropped=[];
+  for(let k=0;k<L.obst;k++){let bi=-1,br=-1,wd=520;segs.forEach((g,j)=>{const room=g[1]-g[0]-load[j]-wd;if(room>=0&&room>br){br=room;bi=j;}});
+    if(bi<0){wd=460;segs.forEach((g,j)=>{const room=g[1]-g[0]-load[j]-wd;if(room>=0&&room>br){br=room;bi=j;}});}
+    if(bi<0){dropped.push('obst');continue;}load[bi]+=wd;cnt[bi]++;}
+  segs.forEach((g,j)=>{const n=cnt[j];if(!n)return;const wd=load[j]/n,slack=g[1]-g[0]-load[j];const ws=Array.from({length:n},()=>0.3+r2());const wsum=ws.reduce((a,b)=>a+b,0)+0.6;let c0=g[0]+slack*0.3/wsum;
+    for(let k=0;k<n;k++){const x=Math.round(c0+wd/2);c0+=wd+slack*ws[k]/wsum;flatten(x-70,x+70,120);
+      const OL=WD.obst;const T=OL[Math.floor(rng()*OL.length)];const big=i>=2&&rng()<0.4&&!T.flat?1.2:1;obstacles.push({x,t:T.t,w:T.w*big,h:T.h*big,flat:!!T.flat,passed:false});}});
   obstacles.sort((a,b)=>a.x-b.x);
-  if(L.zones){const Z=L.zones,zl={slip:[300,480],lake:[700,900],mud:[220,320],river:[180,240],belt:[360,520]},zres=[];
-    const zfree=(a,b,strict)=>(strict?reserved:hardRes).every(r=>b<r[0]||a>r[1])&&zres.every(r=>b<r[0]-100||a>r[1]+100);
-    for(const type of Object.keys(Z))for(let n=0,g=0;n<Z[type]&&g<800;g++){const [a,b]=zl[type];const zlen=Math.round(a+r2()*(b-a));const x=Math.round(900+r2()*(L.len-2000));
-      const strict=type==='mud'||type==='river';if(!zfree(x-140,x+zlen+140,strict))continue;zres.push([x,x+zlen]);if(type!=='slip')flatten(x,x+zlen,110);zones.push({x0:x,x1:x+zlen,type,hinted:false});n++;}
-    zones.sort((a,b)=>a.x0-b.x0);}
+  lvlPlanInfo={free:segs.reduce((t,g)=>t+g[1]-g[0],0),need:L.obst*520,dropped};
   } else {
   /* ---- planner for new worlds: fill free stretches between fires/checkpoints in order ---- */
   const r2=mulberry32(99+w*31+i*7);
@@ -512,9 +522,16 @@ function loadBest(){let b={};try{b=JSON.parse(localStorage.getItem(LS_BEST)||'{}
   WORLDS.forEach((_,w)=>{const h=loadHs(w);if(h.length)a[w]=Math.max(a[w],h[0].score);});return a;}
 function saveBest(a){try{localStorage.setItem(LS_BEST,JSON.stringify(Object.assign({},a)));}catch(e){}}
 const needPts=w=>Math.ceil(WORLD_MAX[w]*UNLOCK_PCT);
-function isUnlocked(w,best){if(w===0)return true;best=best||loadBest();return best[w-1]>=needPts(w-1);}
+/* Einmal freigeschaltet = bleibt freigeschaltet (auch wenn sich Höchstpunkte später ändern) */
+const LS_UNL='dinoAutoSpiel.unlocked.v1', LS_UNL_MIG='dinoAutoSpiel.unlockMigrated.v2';
+const LEGACY_NEED=[16650,19260,20790,21600]; // 90 %-Ziele der Version 2.0 (vor der Welt-1-Hindernis-Korrektur)
+function loadUnl(){try{const a=JSON.parse(localStorage.getItem(LS_UNL)||'[]');return Array.isArray(a)?a.filter(x=>Number.isInteger(x)):[];}catch(e){return [];}}
+function addUnl(w){const a=loadUnl();if(!a.includes(w)){a.push(w);a.sort();try{localStorage.setItem(LS_UNL,JSON.stringify(a));}catch(e){}}}
+function migrateUnlocks(){try{if(localStorage.getItem(LS_UNL_MIG))return;const b=loadBest();for(let w=1;w<WORLDS.length;w++)if(b[w-1]>=LEGACY_NEED[w-1])addUnl(w);localStorage.setItem(LS_UNL_MIG,'1');}catch(e){}}
+function isUnlocked(w,best){if(w===0)return true;if(loadUnl().includes(w))return true;best=best||loadBest();const ok=best[w-1]>=needPts(w-1);if(ok)addUnl(w);return ok;}
 function updateBest(){const b0=loadBest();const before=WORLDS.map((_,w)=>isUnlocked(w,b0));const b=b0.slice();if(Math.round(score)>b[worldIdx]){b[worldIdx]=Math.round(score);saveBest(b);}
   return WORLDS.findIndex((_,w)=>!before[w]&&isUnlocked(w,b));}
+migrateUnlocks();
 function showUnlock(el,nu){if(nu!=null&&nu>=0){el.innerHTML='🎉🔓 Neue Welt freigeschaltet: '+WORLDS[nu].emoji+' '+WORLDS[nu].name+'!';el.classList.remove('hidden');SFX.check();}else el.classList.add('hidden');}
 function worldProgressHtml(w){const b=loadBest()[w],pct=Math.min(100,Math.floor(b/WORLD_MAX[w]*100));const nxt=w+1<WORLDS.length;
   return `<p style="font-size:18px">⭐ Bestwert Welt ${w+1}: <b>${fmt(b)}</b> / ${fmt(WORLD_MAX[w])} (${pct} %)${nxt?(isUnlocked(w+1)?' · Welt '+(w+2)+' ist frei ✅':' · für Welt '+(w+2)+' nötig: '+fmt(needPts(w))+' (90 %)'):''}</p>`;}
@@ -1025,7 +1042,7 @@ function confirmBox(text,yes,no){$('cfText').textContent=text;$('sConfirm').clas
   $('cfYes').onclick=()=>{$('sConfirm').classList.add('hidden');SFX.click();yes&&yes();};$('cfNo').onclick=()=>{$('sConfirm').classList.add('hidden');SFX.click();no&&no();};}
 
 /* =================== Test hooks =================== */
-if(TEST){window.__game={get crashLog(){return crashLog},get levelTime(){return levelTime},get worldIdx(){return worldIdx},WORLDS,WORLD_MAX,loadBest,saveBest,isUnlocked,needPts,laserOn,zoneAt,buildWorlds,get state(){return state},get car(){return car},get lvl(){return lvl},get boss(){return boss},get score(){return score},set score(v){score=v},get hearts(){return hearts},get levelIdx(){return levelIdx},
+if(TEST){window.__game={get crashLog(){return crashLog},get levelTime(){return levelTime},get worldIdx(){return worldIdx},WORLDS,WORLD_MAX,loadBest,saveBest,isUnlocked,loadUnl,migrateUnlocks,needPts,laserOn,zoneAt,buildWorlds,get state(){return state},get car(){return car},get lvl(){return lvl},get boss(){return boss},get score(){return score},set score(v){score=v},get hearts(){return hearts},get levelIdx(){return levelIdx},
   get fireballs(){return fireballs},input,startRun,startLevelPlay,update,loadHs,stats,endRun,qualifies,crash,
   setManual(m){manual=m},step(sec,ctl){const n=Math.round(sec*60);for(let i=0;i<n;i++){if(ctl)ctl();update(1/60);if(state!=='play')return i;}return n;},
   teleport(x){car.x=x;car.y=groundY(x);car.vx=0;car.vy=0;car.onGround=true;maxX=Math.max(maxX,x);camX=x-W*0.3;camY=car.y-H*0.62;},groundY};}
