@@ -27,7 +27,7 @@ Die nächste Welt öffnet sich, sobald du in der Welt davor **90 % der Höchstpu
 
 | Welt | Höchstpunkte | 90 % nötig für die nächste Welt |
 |---|---|---|
-| 1 Abenteuer-Land | 27.600 | 24.840 |
+| 1 Abenteuer-Land | 29.400 | 26.460 |
 | 2 Eiswelt | 21.400 | 19.260 |
 | 3 Dschungelwelt | 23.100 | 20.790 |
 | 4 Chemiewelt | 24.000 | 21.600 |

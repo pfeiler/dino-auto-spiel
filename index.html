@@ -349,11 +349,37 @@ function w1LegacyRamps(L,i){const rng=mulberry32(4242+i*977);rng();rng();const t
 /* freie Strecken für Hindernisse in Welt 1: Abstand zu Start, Feuern, Checkpoints, Rampen (inkl. Landezone) und Ziel/Boss wie in den neuen Welten */
 function w1Segs(L){const len=L.len,total=len+2500;const fx=[[0,800]];L.fires.forEach(f=>{const x=Math.round(len*f.at);fx.push([x-420,x+200]);});
   const cps=[Math.round(len/3),Math.round(len*2/3)];if(L.boss)cps.push(len-1900);cps.forEach(c=>fx.push([c-120,c+240]));
-  L.ramps0.forEach(r=>{const x=Math.round(r.f*len);fx.push([x-100,x+r.len+650]);});fx.push(L.boss?[len-2100,total]:[len-400,total]);
+  L.ramps0.concat(L.rampsX||[]).forEach(r=>{const x=Math.round(r.f*len);fx.push([x-100,x+r.len+650]);});fx.push(L.boss?[len-2100,total]:[len-400,total]);
   fx.sort((a,b)=>a[0]-b[0]);const segs=[];let cur=0;for(const [a,b] of fx){if(a>cur)segs.push([cur,a]);cur=Math.max(cur,b);}return segs;}
 function w1Fits(L){const segs=w1Segs(L),load=segs.map(()=>0);for(let k=0;k<L.obst;k++){let bi=-1,br=-1;segs.forEach((g,j)=>{const room=g[1]-g[0]-load[j]-520;if(room>=0&&room>br){br=room;bi=j;}});if(bi<0)return false;load[bi]+=520;}return true;}
-WORLDS[0].levels.forEach((L,i)=>{L.len0=L.len;L.ramps0=w1LegacyRamps(L,i);while(!w1Fits(L))L.len+=100;L.len+=200;/* +200 m Luft, damit es nicht eng wird */});
-const WORLD_MAX=[27600,21400,23100,24000,25000];
+/* Welt 1: fehlende Rampen ergänzen (Soll L.ramps). Rampe + Landezone belegen [x-100, x+Länge+650] in einem freien Stück (wie Hindernisse:
+   weg von Start, Feuern, Checkpoints, anderen Rampen, Ziel/Boss); zusätzlich wie die alten Rampen ≥450 hinter / ≥650 vor jedem Feuer
+   (Landezone endet vor dem Feuer) und ≥220/260 Abstand zu Checkpoints. Verteilung: alle Kombinationen "welche Rampe in welches Stück" durchprobieren,
+   so dass alle Hindernisse (je 520) weiter Platz haben, und die Variante mit den am weitesten auseinanderliegenden Rampen nehmen. null = passt nicht. */
+const W1RC={f:[650,300],c:[220,260],r:150};
+function w1RampOk(L,x,rl){const len=L.len,a=x-W1RC.r,b=x+rl+650;if(a<800||b>(L.boss?len-2100:len-400))return false;
+  for(const f of L.fires){const fx=Math.round(len*f.at);if(b>fx-W1RC.f[0]&&a<fx+W1RC.f[1])return false;}
+  const cps=[Math.round(len/3),Math.round(len*2/3)];if(L.boss)cps.push(len-1900);for(const c of cps)if(b>c-W1RC.c[0]&&a<c+W1RC.c[1])return false;return true;}
+function w1ExtraRamps(L,i){L.rampsX=[];const n=L.ramps-L.ramps0.length;if(n<=0)return [];
+  const rng=mulberry32(5150+i*313);const sz=Array.from({length:n},()=>({len:240+rng()*80,ht:70+rng()*50}));
+  const segs=w1Segs(L),legacy=L.ramps0.map(r=>r.f*L.len);let best=null;
+  const comps=(m,k)=>{if(k===1)return [[m]];const o=[];for(let c=0;c<=m;c++)for(const r of comps(m-c,k-1))o.push([c,...r]);return o;};
+  const rec=(t,j0)=>{if(t.length===n){let cap=0,xs=[],ri=0;
+      for(let j=0;j<segs.length;j++){const [g0,g1]=segs[j],R=g1-g0,mine=t.filter(q=>q===j).map(()=>sz[ri++]);
+        if(!mine.length){cap+=Math.floor(R/520);continue;}const Wr=mine.reduce((s,r)=>s+r.len+750,0);if(Wr>R)return;
+        const m=Math.floor((R-Wr)/520),sl=(R-Wr-m*520)/(mine.length+1);let bx=null,bs=-1;
+        for(const cs of comps(m,mine.length+1)){let c0=g0,px=[],ok=true;for(let k=0;k<mine.length;k++){c0+=cs[k]*520+sl;const x=Math.round(c0+100);if(!w1RampOk(L,x,mine[k].len)){ok=false;break;}px.push(x);c0+=mine[k].len+750;}
+          if(!ok)continue;const pts=[g0,...px,g1];let sp=1e9;for(let k=1;k<pts.length;k++)sp=Math.min(sp,pts[k]-pts[k-1]);if(sp>bs){bs=sp;bx=px;}}
+        if(!bx)return;cap+=m;xs.push(...bx);}
+      if(cap<L.obst)return;const all=legacy.concat(xs).sort((p,q)=>p-q);let sp=1e9;for(let k=1;k<all.length;k++)sp=Math.min(sp,all[k]-all[k-1]);
+      if(!best||sp>best.sp)best={sp,xs};return;}
+    for(let j=j0;j<segs.length;j++)rec(t.concat(j),j);};
+  rec([],0);if(!best)return null;
+  L.rampsX=best.xs.map((x,k)=>({f:x/L.len,len:sz[k].len,ht:sz[k].ht}));if(!w1Fits(L)){L.rampsX=[];return null;}return L.rampsX;}
+WORLDS[0].levels.forEach((L,i)=>{L.len0=L.len;L.ramps0=w1LegacyRamps(L,i);L.rampsX=[];while(!w1Fits(L))L.len+=100;L.len+=200;/* +200 m Luft, damit es nicht eng wird */
+  const len1=L.len;while(!w1ExtraRamps(L,i))L.len+=100;
+  if(L.len>len1){L.len+=200;while(!w1ExtraRamps(L,i))L.len+=100;}/* musste die Strecke wachsen: wieder +200 m Luft */});
+const WORLD_MAX=[29400,21400,23100,24000,25000];
 const UNLOCK_PCT=0.9;
 const LS_BEST='dinoAutoSpiel.worldBest.v1', LS_MUSIC='dinoAutoSpiel.music';
 const BASE=430, G=1800, WG=700, WSPEED=950;
@@ -390,8 +416,8 @@ function buildLevel(w,i){lvlPlanInfo=null;
   res(L.len-300,total);
   const ramps=[],zones=[],lasers=[],obstacles=[];
   if(w===0){
-  /* Welt 1: Rampen wie bisher (gleiche Zufallsfolge, gleiche relative Lage), Hindernisse jetzt mit dem Planer der neuen Welten */
-  for(const r of L.ramps0){const x=Math.round(r.f*L.len),len=r.len,ht=r.ht;flatten(x-80,x+len+40,140);
+  /* Welt 1: Rampen wie bisher (gleiche Zufallsfolge, gleiche relative Lage) + ergänzte Rampen, Hindernisse jetzt mit dem Planer der neuen Welten */
+  for(const r of L.ramps0.concat(L.rampsX)){const x=Math.round(r.f*L.len),len=r.len,ht=r.ht;flatten(x-80,x+len+40,140);
     const k0=Math.round(x/10),k1=Math.round((x+len)/10);for(let k=k0;k<=k1;k++)h[k]+=ht*((k-k0)/(k1-k0));for(let k=k1+1;k<=k1+3;k++)h[k]+=ht*(1-(k-k1)/3);
     ramps.push({x,len,ht});hardRes.push([x-100,x+len+650]);}
   const r2=mulberry32(99+i*7);const segs=w1Segs(L);
@@ -525,9 +551,12 @@ const needPts=w=>Math.ceil(WORLD_MAX[w]*UNLOCK_PCT);
 /* Einmal freigeschaltet = bleibt freigeschaltet (auch wenn sich Höchstpunkte später ändern) */
 const LS_UNL='dinoAutoSpiel.unlocked.v1', LS_UNL_MIG='dinoAutoSpiel.unlockMigrated.v2';
 const LEGACY_NEED=[16650,19260,20790,21600]; // 90 %-Ziele der Version 2.0 (vor der Welt-1-Hindernis-Korrektur)
+const LEGACY_NEED2=[24840,19260,20790,21600], LS_UNL_MIG3='dinoAutoSpiel.unlockMigrated.v3'; // 90 %-Ziele nach der Hindernis-Korrektur (vor den ergänzten Welt-1-Rampen)
 function loadUnl(){try{const a=JSON.parse(localStorage.getItem(LS_UNL)||'[]');return Array.isArray(a)?a.filter(x=>Number.isInteger(x)):[];}catch(e){return [];}}
 function addUnl(w){const a=loadUnl();if(!a.includes(w)){a.push(w);a.sort();try{localStorage.setItem(LS_UNL,JSON.stringify(a));}catch(e){}}}
-function migrateUnlocks(){try{if(localStorage.getItem(LS_UNL_MIG))return;const b=loadBest();for(let w=1;w<WORLDS.length;w++)if(b[w-1]>=LEGACY_NEED[w-1])addUnl(w);localStorage.setItem(LS_UNL_MIG,'1');}catch(e){}}
+function migrateUnlocks(){try{const b=loadBest();
+  if(!localStorage.getItem(LS_UNL_MIG)){for(let w=1;w<WORLDS.length;w++)if(b[w-1]>=LEGACY_NEED[w-1])addUnl(w);localStorage.setItem(LS_UNL_MIG,'1');}
+  if(!localStorage.getItem(LS_UNL_MIG3)){for(let w=1;w<WORLDS.length;w++)if(b[w-1]>=LEGACY_NEED2[w-1])addUnl(w);localStorage.setItem(LS_UNL_MIG3,'1');}}catch(e){}}
 function isUnlocked(w,best){if(w===0)return true;if(loadUnl().includes(w))return true;best=best||loadBest();const ok=best[w-1]>=needPts(w-1);if(ok)addUnl(w);return ok;}
 function updateBest(){const b0=loadBest();const before=WORLDS.map((_,w)=>isUnlocked(w,b0));const b=b0.slice();if(Math.round(score)>b[worldIdx]){b[worldIdx]=Math.round(score);saveBest(b);}
   return WORLDS.findIndex((_,w)=>!before[w]&&isUnlocked(w,b));}
