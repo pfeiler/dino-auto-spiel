@@ -71,3 +71,9 @@ Level-Bonus, Zeit-Bonus, „Ohne Unfall“-Bonus (+300) und Endgegner besiegt (+
 Top 10 je Welt (Name, Punkte, Level, Fahrzeug, Datum), gespeichert im Browser (localStorage).
 
 Tastatur (PC): Pfeiltasten / Leertaste, Wasser mit **X** oder **F**.
+
+## ⚙️ Einstellungen
+Im Hauptmenü unter **⚙️ Einstellungen**: Musik an/aus (wie der 🎵-Knopf im Spiel) und **🗑 Alles zurücksetzen**.
+Zurücksetzen fragt zweimal nach („Wirklich alles löschen? …“ → „Ganz sicher?“, der Ja-Knopf ist dabei kurz gesperrt und wechselt die Seite), damit es nicht aus Versehen passiert.
+Gelöscht werden: Sterne, Level-Bestwerte, Level-Karte, Welt-Freischaltungen (nur Welt 1 bleibt offen), Endgegner-Siege, Werkstatt-Sachen und -Auswahl, Salto-Hinweis und alle Bestenlisten.
+Erhalten bleiben: die Musik-Einstellung und der zuletzt eingetippte Name. Danach schaltet keine alte Umstellung (Migration) wieder etwas frei.

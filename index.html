@@ -51,7 +51,9 @@ p{font-size:22px;margin:8px 0;color:#4e342e}
 .big{font-size:30px;font-weight:bold}
 .btn{font-family:inherit;font-size:28px;font-weight:bold;padding:14px 30px;margin:8px;border-radius:22px;border:4px solid #fff;color:#fff;background:#43a047;box-shadow:0 6px 0 #0004;cursor:pointer;touch-action:manipulation}
 .btn:active{transform:translateY(4px);box-shadow:0 2px 0 #0004}
-.btn.blue{background:#1e88e5}.btn.red{background:#e53935}.btn.gray{background:#78909c}.btn.orange{background:#fb8c00}
+.btn.blue{background:#1e88e5}.btn.red{background:#e53935}.btn.danger{background:#c62828;font-size:30px;padding:18px 36px;border-color:#ffcdd2}.btn:disabled{opacity:.45;filter:grayscale(.6)}
+.setrow{display:flex;align-items:center;justify-content:center;gap:16px;margin:10px 0;font-size:24px}.dangerzone{margin:18px auto 6px;padding:12px 16px;border:4px dashed #ef9a9a;border-radius:22px;background:#fff3f3;max-width:640px}.dangerzone p{margin:4px 0;font-size:17px;color:#8d3434}
+.okmsg{background:#e8f5e9;border:3px solid #66bb6a;border-radius:18px;padding:8px 14px;font-size:22px;font-weight:bold;color:#2e7d32;margin:8px auto;max-width:620px}.btn.gray{background:#78909c}.btn.orange{background:#fb8c00}
 .vgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:10px 0}
 .vcard{border:5px solid #ddd;border-radius:22px;padding:8px;background:#fff;cursor:pointer;font-size:20px;font-weight:bold;color:#333;font-family:inherit}
 .vcard canvas{position:static;width:100%;height:auto;display:block}
@@ -168,6 +170,8 @@ table.hs tr.prov td{background:#e3f2fd;font-style:italic}
     <p>5 Welten · 25 Level · 5 Endgegner!</p>
     <button class="btn" id="btnStart">▶ Spielen</button>
     <button class="btn blue" id="btnHsTitle">🏆 Bestenliste</button>
+    <button class="btn gray" id="btnSettings">⚙️ Einstellungen</button>
+    <div id="titleMsg" class="okmsg hidden"></div>
     <p style="font-size:16px;color:#888">Gas ▶ · Bremse ◀ · Springen ⤒ · Wasser 💧 (halten oder aufs Feuer tippen) · Salto: in der Luft ⤒ halten</p>
   </div>
 </div>
@@ -257,6 +261,19 @@ table.hs tr.prov td{background:#e3f2fd;font-style:italic}
     <button class="btn" id="btnHsAgain">▶ Nochmal spielen</button>
     <button class="btn gray" id="btnHsHome">🏠 Start</button>
     <button class="btn red" id="btnHsClear">🗑 Löschen</button>
+  </div>
+</div>
+<!-- Einstellungen -->
+<div id="sSettings" class="screen hidden">
+  <div class="panel" style="max-width:760px">
+    <h2>⚙️ Einstellungen</h2>
+    <div class="setrow"><span>🎵 Musik beim Fahren</span><button class="btn blue" id="btnSetMusic">🎵 An</button></div>
+    <div class="dangerzone">
+      <p><b>⚠️ Für Erwachsene:</b> Hier kannst du das ganze Spiel wieder auf Anfang stellen.</p>
+      <p>Sterne, Welten, Level-Karte, Werkstatt und alle Bestenlisten werden gelöscht. Die Musik-Einstellung bleibt.</p>
+      <button class="btn danger" id="btnReset">🗑 Alles zurücksetzen</button>
+    </div>
+    <button class="btn gray" id="btnSetBack">🏠 Zurück</button>
   </div>
 </div>
 <!-- Confirm -->
@@ -547,7 +564,7 @@ const groundY=x=>BASE-hAt(x);
 const slope=x=>(groundY(x+6)-groundY(x-6))/12;
 
 /* =================== Run / level flow =================== */
-function showScreen(id){['sTitle','sWorld','sMap','sWerk','sSelect','sLevel','sEnd','sHs'].forEach(s=>$(s).classList.toggle('hidden',s!==id));
+function showScreen(id){['sTitle','sWorld','sMap','sWerk','sSelect','sLevel','sEnd','sHs','sSettings'].forEach(s=>$(s).classList.toggle('hidden',s!==id));
   const playing=id===null;$('hud').classList.toggle('hidden',!playing);$('controls').classList.toggle('hidden',!playing);$('progress').classList.toggle('hidden',!playing);if(!playing)$('hint').classList.add('hidden');}
 function startRun(vi,startLevel=0,w=0){worldIdx=w|0;vehIdx=vi;veh=VEHICLES[vi];score=0;runId=Date.now();stats.jumps=stats.fires=stats.obst=stats.saltos=stats.wobbles=0;landLog=[];startLevel=startLevel|0;startLevelPlay(startLevel);}
 function startLevelPlay(i){
@@ -679,7 +696,9 @@ function addBossWin(w){const a=bossWins();if(!a.includes(w))a.push(w);lsSet(LS_B
 const starsToNext=w=>Math.max(0,STAR_NEED-starsIn(w)); // fehlende Sterne in Welt w bis Welt w+1
 function loadUnl(){try{const a=JSON.parse(localStorage.getItem(LS_UNL)||'[]');return Array.isArray(a)?a.filter(x=>Number.isInteger(x)):[];}catch(e){return [];}}
 function addUnl(w){const a=loadUnl();if(!a.includes(w)){a.push(w);a.sort();try{localStorage.setItem(LS_UNL,JSON.stringify(a));}catch(e){}}}
-function migrateUnlocks(){try{const b=loadBest();
+/* Nach „Alles zurücksetzen“ darf keine alte Migration wieder etwas freischalten */
+const LS_RESET='dinoAutoSpiel.resetDone.v1';
+function migrateUnlocks(){try{if(localStorage.getItem(LS_RESET)){[LS_UNL_MIG,LS_UNL_MIG3,LS_UNL_MIG4].forEach(k=>localStorage.setItem(k,'1'));return;}const b=loadBest();
   if(!localStorage.getItem(LS_UNL_MIG)){for(let w=1;w<WORLDS.length;w++)if(b[w-1]>=LEGACY_NEED[w-1])addUnl(w);localStorage.setItem(LS_UNL_MIG,'1');}
   if(!localStorage.getItem(LS_UNL_MIG3)){for(let w=1;w<WORLDS.length;w++)if(b[w-1]>=LEGACY_NEED2[w-1])addUnl(w);localStorage.setItem(LS_UNL_MIG3,'1');}
   if(!localStorage.getItem(LS_UNL_MIG4)){for(let w=1;w<WORLDS.length;w++)if(b[w-1]>=LEGACY_NEED3[w-1])addUnl(w);localStorage.setItem(LS_UNL_MIG4,'1');}}catch(e){}}
@@ -1330,11 +1349,30 @@ $('musicBtn').addEventListener('pointerdown',e=>e.stopPropagation());
 $('musicBtn').onclick=()=>{musicOn=!musicOn;try{localStorage.setItem(LS_MUSIC,musicOn?'1':'0');}catch(e){}setMusicBtn();};setMusicBtn();
 $('quitBtn').addEventListener('pointerdown',e=>e.stopPropagation());
 $('quitBtn').onclick=()=>{if(state!=='play')return;paused=true;setEngine(false,0);setSpray(false);confirmBox('Fahrt wirklich beenden?',()=>{paused=false;endRun('quit');},()=>{paused=false;});};
-function confirmBox(text,yes,no){$('cfText').textContent=text;$('sConfirm').classList.remove('hidden');
+function confirmBox(text,yes,no,o){o=o||{};$('cfText').textContent=text;$('cfYes').textContent=o.yes||'Ja';$('cfNo').textContent=o.no||'Nein';
+  $('cfYes').parentNode.insertBefore(o.swap?$('cfNo'):$('cfYes'),o.swap?$('cfYes'):$('cfNo'));
+  $('cfYes').disabled=!!o.delay;if(o.delay)setTimeout(()=>{$('cfYes').disabled=false;},o.delay);$('sConfirm').classList.remove('hidden');
   $('cfYes').onclick=()=>{$('sConfirm').classList.add('hidden');SFX.click();yes&&yes();};$('cfNo').onclick=()=>{$('sConfirm').classList.add('hidden');SFX.click();no&&no();};}
+/* ---- Einstellungen & „Alles zurücksetzen“ ---- */
+const RESET_KEEP=[LS_MUSIC,LS_NAME];
+function resetAll(){try{const ks=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith('dinoAutoSpiel.')&&!RESET_KEEP.includes(k))ks.push(k);}
+  ks.forEach(k=>localStorage.removeItem(k));
+  [LS_UNL_MIG,LS_UNL_MIG3,LS_UNL_MIG4].forEach(k=>localStorage.setItem(k,'1'));localStorage.setItem(LS_RESET,String(Date.now()));}catch(e){}
+  worldIdx=0;levelIdx=0;mapLevel=0;lvl=null;refreshCos();return true;}
+function setSetMusic(){$('btnSetMusic').textContent=musicOn?'🎵 An':'🔇 Aus';$('btnSetMusic').className='btn '+(musicOn?'blue':'gray');}
+function showSettings(){setSetMusic();showScreen('sSettings');}
+$('btnSettings').onclick=()=>{audioUnlock();SFX.click();$('titleMsg').classList.add('hidden');showSettings();};
+$('btnSetBack').onclick=()=>{SFX.click();showScreen('sTitle');};
+$('btnSetMusic').onclick=()=>{SFX.click();musicOn=!musicOn;try{localStorage.setItem(LS_MUSIC,musicOn?'1':'0');}catch(e){}setMusicBtn();setSetMusic();};
+$('btnReset').onclick=()=>{SFX.click();
+  confirmBox('Wirklich alles löschen? Sterne, Welten, Werkstatt und Highscores sind dann weg.',()=>{
+    confirmBox('Ganz sicher? Das kann man nicht rückgängig machen!',()=>{resetAll();SFX.boing&&SFX.boing();
+      $('titleMsg').textContent='✨ Alles zurückgesetzt! Das Abenteuer beginnt von vorn – viel Spaß! 🦖';$('titleMsg').classList.remove('hidden');showScreen('sTitle');
+      clearTimeout(resetAll.t);resetAll.t=setTimeout(()=>$('titleMsg').classList.add('hidden'),6000);},null,{yes:'Ja, wirklich alles löschen',no:'Abbrechen',swap:true,delay:800});
+  },null,{yes:'Ja, löschen',no:'Abbrechen'});};
 
 /* =================== Test hooks =================== */
-if(TEST){window.__game={get crashLog(){return crashLog},get levelTime(){return levelTime},get worldIdx(){return worldIdx},WORLDS,WORLD_MAX,loadBest,saveBest,isUnlocked,loadUnl,migrateUnlocks,needPts,laserOn,zoneAt,buildWorlds,starMask,levelStars,starsIn,totalStars,saveStars,levelBest,reachedLevel,bossWins,HATS,PAINTS,cosUnlocked,loadCos,saveCos,newCosmetics,showMap,showWerk,werkPick,get drawCos(){return drawCos},get lastStars(){return lastStars},get landLog(){return landLog},STAR_NEED,RAMP_LAND,FLIP_T,SALTO_PTS,wrapAng,get mapLevel(){return mapLevel},get state(){return state},get car(){return car},get lvl(){return lvl},get boss(){return boss},get score(){return score},set score(v){score=v},get hearts(){return hearts},get levelIdx(){return levelIdx},
+if(TEST){window.__game={get crashLog(){return crashLog},get levelTime(){return levelTime},get worldIdx(){return worldIdx},WORLDS,WORLD_MAX,loadBest,saveBest,isUnlocked,loadUnl,migrateUnlocks,needPts,laserOn,zoneAt,buildWorlds,starMask,levelStars,starsIn,totalStars,saveStars,levelBest,reachedLevel,bossWins,HATS,PAINTS,cosUnlocked,loadCos,saveCos,newCosmetics,showMap,showWerk,werkPick,get drawCos(){return drawCos},get lastStars(){return lastStars},get landLog(){return landLog},STAR_NEED,RAMP_LAND,resetAll,showSettings,get musicOn(){return musicOn},FLIP_T,SALTO_PTS,wrapAng,get mapLevel(){return mapLevel},get state(){return state},get car(){return car},get lvl(){return lvl},get boss(){return boss},get score(){return score},set score(v){score=v},get hearts(){return hearts},get levelIdx(){return levelIdx},
   get fireballs(){return fireballs},input,startRun,startLevelPlay,update,loadHs,stats,endRun,qualifies,crash,
   setManual(m){manual=m},step(sec,ctl){const n=Math.round(sec*60);for(let i=0;i<n;i++){if(ctl)ctl();update(1/60);if(state!=='play')return i;}return n;},
   teleport(x){car.x=x;car.y=groundY(x);car.vx=0;car.vy=0;car.onGround=true;maxX=Math.max(maxX,x);camX=x-W*0.3;camY=car.y-H*0.62;},groundY};}
