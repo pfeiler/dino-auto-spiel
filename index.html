@@ -22,6 +22,7 @@ canvas{position:fixed;inset:0;display:block;touch-action:none}
 #scoreBox{background:rgba(255,255,255,.92);border:5px solid #ffb300;border-radius:22px;padding:2px 22px;font-size:44px;font-weight:900;color:#e65100;
  box-shadow:0 5px 0 #0004;min-width:200px;text-align:center;transition:transform .12s}
 #scoreBox.bump{transform:scale(1.18)}
+#hearts{transition:transform .15s}#hearts.bump{transform:scale(1.3)}
 #scoreBox small{font-size:22px;color:#8d6e63;margin-right:6px}
 #quitBtn{pointer-events:auto;font-size:20px;padding:10px 16px;border-radius:16px;border:3px solid #fff;background:#c62828;color:#fff;font-weight:bold;font-family:inherit;box-shadow:0 4px 0 #0005}
 #progress{position:fixed;left:50%;transform:translateX(-50%);top:calc(max(8px,env(safe-area-inset-top)) + 72px);width:min(46vw,460px);height:14px;background:#0005;border-radius:8px;pointer-events:none;border:2px solid #fff8}
@@ -336,6 +337,10 @@ const SFX={
   salto(k){noise(0.35,600,'bandpass',0.22,0,2400);[523,659,784,1046,1319,1568].slice(0,3+k).forEach((f,i)=>tone(f,0.16,'triangle',0.17,null,0.05+i*0.07));},
   star(i,on){if(on){const f=[784,1046,1319][i];tone(f,0.35,'triangle',0.2);tone(f*2,0.25,'sine',0.07,null,0.04);tone(f*1.5,0.2,'sine',0.06,null,0.1);}else tone(196,0.2,'sine',0.12,150);},
   hurtBoss(){tone(300,0.1,'square',0.06,200);},
+  gate(){noise(1.0,500,'bandpass',0.16,0,2600);[392,523,659,784].forEach((f,i)=>tone(f,0.14,'triangle',0.14,null,0.25+i*0.1));tone(140,0.2,'square',0.08,90,0.95);},
+  cage(){tone(700,0.07,'square',0.07);tone(520,0.09,'square',0.07,null,0.08);[659,880,1175].forEach((f,i)=>tone(f,0.16,'triangle',0.15,null,0.2+i*0.08));},
+  heart(){[784,988,1175,1568].forEach((f,i)=>tone(f,0.18,'sine',0.2,null,i*0.07));tone(1568,0.3,'triangle',0.1,null,0.32);},
+  heartLand(){tone(420,0.12,'sine',0.15,260);},
   zap(){const n=performance.now();if(n-lastBump<250)return;lastBump=n;tone(1800,0.12,'sawtooth',0.08,300);noise(0.12,4000,'highpass',0.15);}
 };
 /* ---- music: one variation per world ---- */
@@ -423,9 +428,17 @@ const WORLDS=[
   {name:'Blitz-Robo-Zentrale',theme:'elec2',len:8000,hill:hl(65,20),obst:5,ramps:1,fires:[{at:0.2,type:'trafo'},{at:0.45,type:'wall'}],lasers:2,boss:true}]}];
 /* Landezone hinter jeder Rampe (Salto-Sprünge fliegen bis ~800 px weit): bleibt frei von Hindernissen, Feuern, Zonen */
 const RAMP_LAND=900;
-// new worlds: level length follows from its content (so every obstacle/ramp/zone fits with ~20 % slack)
+/* Herausforderungen je Level (Welt × Level): Gitter-Tore (mit Rädchen) und Herz-Käfige (mit Wasserrad).
+   Welt 1 · Level 1 bleibt ein reines Lern-Level; Herz-Käfige nie in der Boss-Arena (im Boss-Level vor der Arena), Gitter-Tore nicht im Boss-Level.
+   Platzbedarf je Herausforderung (CH_WD) wird wie ein Hindernis im Planer reserviert: Tor = 440 Anlauf + Rädchen + 300 bis zum Tor + 260 dahinter,
+   Herz = 480 Anlauf + Wasserrad + 200 bis zum Käfig + 520 Platz für das gelandete Herz. */
+const CH_GATES=[[0,0,1,1,0],[0,1,1,1,0],[0,1,1,2,0],[1,1,1,2,0],[1,1,2,2,0]];
+const CH_HEARTS=[[0,1,1,1,1],[1,1,0,1,1],[1,0,1,1,1],[1,1,0,1,1],[1,0,1,1,1]];
+const CH_WD={gate:1000,heart:1200};
+WORLDS.forEach((Wd,w)=>Wd.levels.forEach((l,i)=>{l.gates=CH_GATES[w][i];l.hearts=CH_HEARTS[w][i];}));
+// new worlds: level length follows from its content (so every obstacle/ramp/zone/challenge fits with ~20 % slack)
 WORLDS.slice(1).forEach(Wd=>Wd.levels.forEach(l=>{const Z=l.zones||{};const need=l.ramps*(380+RAMP_LAND)+l.obst*520+(l.lasers||0)*600+(Z.mud||0)*570+(Z.river||0)*510;
-  l.len=Math.round((1200+l.fires.length*620+720+1.32*need+(l.boss?2300:0))/100)*100;}));
+  l.len=Math.round((1200+l.fires.length*620+720+1.32*need+1.25*(l.gates*CH_WD.gate+l.hearts*CH_WD.heart)+(l.boss?2300:0))/100)*100;}));
 const BOSS_T={
  dragon:{label:'🐉 Feuer-Drache',hp:320,base:1.7,vary:1.3,T:1.9,mouth:[-120,-205],proj:'fire',patch:'fire',hint:'🐉 Der Feuer-Drache! Lösche ihn mit WASSER 💧!',defeat:'Drache besiegt! 🐉',win:'Der Drache ist gelöscht!',done:'Du hast den Drachen gelöscht! Fahr ins Ziel! 🏁'},
  yeti:{label:'❄️ Eis-Yeti',hp:340,base:1.6,vary:1.2,T:1.85,mouth:[-115,-265],proj:'snow',patch:'snow',hint:'❄️ Der Eis-Yeti! Warmes WASSER 💧 lässt ihn schmelzen!',defeat:'Yeti geschmolzen! ❄️',win:'Der Eis-Yeti ist geschmolzen!',done:'Der Yeti ist geschmolzen! Fahr ins Ziel! 🏁'},
@@ -445,7 +458,10 @@ function w1Segs(L){const len=L.len,total=len+2500;const fx=[[0,800]];L.fires.for
   const cps=[Math.round(len/3),Math.round(len*2/3)];if(L.boss)cps.push(len-1900);cps.forEach(c=>fx.push([c-120,c+240]));
   L.ramps0.concat(L.rampsX||[]).forEach(r=>{const x=Math.round(r.f*len);fx.push([x-100,x+r.len+RAMP_LAND]);});fx.push(L.boss?[len-2100,total]:[len-400,total]);
   fx.sort((a,b)=>a[0]-b[0]);const segs=[];let cur=0;for(const [a,b] of fx){if(a>cur)segs.push([cur,a]);cur=Math.max(cur,b);}return segs;}
-function w1Fits(L){const segs=w1Segs(L),load=segs.map(()=>0);for(let k=0;k<L.obst;k++){let bi=-1,br=-1;segs.forEach((g,j)=>{const room=g[1]-g[0]-load[j]-520;if(room>=0&&room>br){br=room;bi=j;}});if(bi<0)return false;load[bi]+=520;}return true;}
+/* Welt 1: alles, was in die freien Stücke muss – Herz-Käfige, Gitter-Tore (groß, zuerst) und Hindernisse (je 520) */
+function w1ItemList(L){const a=[];for(let k=0;k<(L.hearts||0);k++)a.push({k:'heart',wd:CH_WD.heart});for(let k=0;k<(L.gates||0);k++)a.push({k:'gate',wd:CH_WD.gate});for(let k=0;k<L.obst;k++)a.push({k:'obst',wd:520});return a;}
+function w1PackOk(gaps,L){const load=gaps.map(()=>0);for(const it of w1ItemList(L)){let bi=-1,br=-1;gaps.forEach((R,j)=>{const room=R-load[j]-it.wd;if(room>=0&&room>br){br=room;bi=j;}});if(bi<0)return false;load[bi]+=it.wd;}return true;}
+function w1Fits(L){return w1PackOk(w1Segs(L).map(g=>g[1]-g[0]),L);}
 /* Welt 1: fehlende Rampen ergänzen (Soll L.ramps). Rampe + Landezone belegen [x-100, x+Länge+RAMP_LAND] in einem freien Stück (wie Hindernisse:
    weg von Start, Feuern, Checkpoints, anderen Rampen, Ziel/Boss); zusätzlich wie die alten Rampen ≥450 hinter / ≥650 vor jedem Feuer
    (Landezone endet vor dem Feuer) und ≥220/260 Abstand zu Checkpoints. Verteilung: alle Kombinationen "welche Rampe in welches Stück" durchprobieren,
@@ -458,14 +474,14 @@ function w1ExtraRamps(L,i){L.rampsX=[];const n=L.ramps-L.ramps0.length;if(n<=0)r
   const rng=mulberry32(5150+i*313);const sz=Array.from({length:n},()=>({len:240+rng()*80,ht:70+rng()*50}));
   const segs=w1Segs(L),legacy=L.ramps0.map(r=>r.f*L.len);let best=null;
   const comps=(m,k)=>{if(k===1)return [[m]];const o=[];for(let c=0;c<=m;c++)for(const r of comps(m-c,k-1))o.push([c,...r]);return o;};
-  const rec=(t,j0)=>{if(t.length===n){let cap=0,xs=[],ri=0;
+  const rec=(t,j0)=>{if(t.length===n){let cap=0,xs=[],ri=0;const gaps=[];
       for(let j=0;j<segs.length;j++){const [g0,g1]=segs[j],R=g1-g0,mine=t.filter(q=>q===j).map(()=>sz[ri++]);
-        if(!mine.length){cap+=Math.floor(R/520);continue;}const Wr=mine.reduce((s,r)=>s+r.len+RAMP_LAND+100,0);if(Wr>R)return;
+        if(!mine.length){cap+=Math.floor(R/520);gaps.push(R);continue;}const Wr=mine.reduce((s,r)=>s+r.len+RAMP_LAND+100,0);if(Wr>R)return;
         const m=Math.floor((R-Wr)/520),sl=(R-Wr-m*520)/(mine.length+1);let bx=null,bs=-1;
         for(const cs of comps(m,mine.length+1)){let c0=g0,px=[],ok=true;for(let k=0;k<mine.length;k++){c0+=cs[k]*520+sl;const x=Math.round(c0+100);if(!w1RampOk(L,x,mine[k].len)){ok=false;break;}px.push(x);c0+=mine[k].len+RAMP_LAND+100;}
           if(!ok)continue;const pts=[g0,...px,g1];let sp=1e9;for(let k=1;k<pts.length;k++)sp=Math.min(sp,pts[k]-pts[k-1]);if(sp>bs){bs=sp;bx=px;}}
-        if(!bx)return;cap+=m;xs.push(...bx);}
-      if(cap<L.obst)return;const all=legacy.concat(xs).sort((p,q)=>p-q);let sp=1e9;for(let k=1;k<all.length;k++)sp=Math.min(sp,all[k]-all[k-1]);
+        if(!bx)return;cap+=m;xs.push(...bx);let e=g0;bx.forEach((x,k)=>{gaps.push(x-100-e);e=x+mine[k].len+RAMP_LAND;});gaps.push(g1-e);}
+      if(cap<L.obst||!w1PackOk(gaps,L))return;const all=legacy.concat(xs).sort((p,q)=>p-q);let sp=1e9;for(let k=1;k<all.length;k++)sp=Math.min(sp,all[k]-all[k-1]);
       if(!best||sp>best.sp)best={sp,xs};return;}
     for(let j=j0;j<segs.length;j++)rec(t.concat(j),j);};
   rec([],0);if(!best)return null;
@@ -473,7 +489,7 @@ function w1ExtraRamps(L,i){L.rampsX=[];const n=L.ramps-L.ramps0.length;if(n<=0)r
 WORLDS[0].levels.forEach((L,i)=>{L.len0=L.len;L.ramps0=w1LegacyRamps(L,i);L.rampsX=[];while(!w1Fits(L))L.len+=100;L.len+=200;/* +200 m Luft, damit es nicht eng wird */
   const len1=L.len;while(!w1ExtraRamps(L,i))L.len+=100;
   if(L.len>len1){L.len+=200;while(!w1ExtraRamps(L,i))L.len+=100;}/* musste die Strecke wachsen: wieder +200 m Luft */});
-const WORLD_MAX=[43100,30300,31000,33000,33000];
+const WORLD_MAX=[46400,33800,35100,37100,37700]; // Version 2.4: mit Gitter-Toren & Herz-Käfigen (vorher 43100/30300/31000/33000/33000)
 const UNLOCK_PCT=0.9;
 const LS_BEST='dinoAutoSpiel.worldBest.v1', LS_MUSIC='dinoAutoSpiel.music';
 const BASE=430, G=1800, WG=700, WSPEED=950;
@@ -485,8 +501,113 @@ let car=null, score=0, hearts=3, crashes=0, levelTime=0, maxX=0, lastCp=0;
 let camX=0,camY=0, parts=[], water=[], pops=[], fireballs=[], boss=null;
 let zapT=0, flashT=0, sprayAcc=0, hintT=0, blockedT=0, levelStartScore=0, runId=0, distAcc=0;
 const input={gas:false,brake:false,jump:false,jumpPressed:false,water:false,aim:null};
-const stats={jumps:0,fires:0,obst:0,saltos:0,wobbles:0};
+const stats={jumps:0,fires:0,obst:0,saltos:0,wobbles:0,gates:0,cages:0,hearts:0,heartsMissed:0};
 let landLog=[];
+
+/* =================== Herausforderungen: Auslöser → Wirkung (erweiterbar) ===================
+ Jede Herausforderung in lvl.challenges = {kind, x, trig, …}: ein AUSLÖSER (trig, Typ aus TRIG_T) schaltet eine WIRKUNG (kind, Typ aus CHAL_T) frei.
+ Heute: Rädchen (wheel) → Gitter-Tor (gate) geht hoch; Wasserrad (waterwheel) → Herz-Käfig (heart) geht auf, das Herz fällt.
+ Später einfach weitere Auslöser ergänzen (z. B. Salto-Schalter, Dampf-Geysir, Dschungel-Samen-Katapult, Stromkreis, Reagenzglas):
+ TRIG_T[typ] = {hub, r, need, back} + Treffer-Regel in trigHit/trigFeed; eine Wirkung braucht make/flat/open/update/draw, par (s) und wd (Platz im Planer). */
+const MAX_HEARTS=3;
+const GATE_PTS=100, CAGE_PTS=150, HEART_PTS=250, HEART_MAX_PTS=250; // Tor auf, Käfig auf (doppelt so viel Spritzen wie ein Feuer), Herz gefangen: immer +250 – fehlt ein Leben, gibt es zusätzlich +1 Herz
+const HEART_G=1000, HEART_LINGER=4, HEART_FADE=1.2, HEART_CATCH_X=100; // Herz fällt sanft, bleibt 4 s liegen, verblasst dann; Fang-Bereich ±100 px
+const LS_GATEDONE='dinoAutoSpiel.gateDone.v1', LS_HEARTDONE='dinoAutoSpiel.heartDone.v1'; // Hinweis nur, bis das Kind es einmal geschafft hat
+const GATE_COLS=['#ff9800','#ab47bc','#26c6da','#ef5350','#9ccc65'];
+/* need = Sekunden Dauerspritzen (normales Auto; Feuerwehr ≈ 1,9× schneller). back = wie weit hinter dem Auto noch automatisch gezielt wird. */
+const TRIG_T={
+ wheel:{name:'Rädchen',hub:150,r:28,need:0.8,back:330},
+ waterwheel:{name:"Wasserrad",hub:170,r:44,need:1.6,back:60}};
+function mkTrig(type,x){return {type,x:Math.round(x),fill:0,need:TRIG_T[type].need,done:false,spin:0,hitT:0};}
+function trigPos(tr){return {x:tr.x,y:groundY(tr.x)-TRIG_T[tr.type].hub};}
+function trigHit(tr,p){const q=trigPos(tr);return Math.hypot(p.x-q.x,p.y-q.y)<TRIG_T[tr.type].r+30;}
+function trigFeed(ch,amt){const tr=ch.trig;if(tr.done)return;tr.fill=Math.min(tr.need,tr.fill+amt);tr.hitT=0.2;
+  if(tr.fill>=tr.need-1e-9){tr.done=true;tr.fill=tr.need;CHAL_T[ch.kind].open(ch);}}
+function trigTick(tr,dt){tr.hitT=Math.max(0,tr.hitT-dt);tr.spin+=dt*(tr.hitT>0?9:tr.done?2.5:0.4);}
+function heartPath(x,y,s){ctx.beginPath();ctx.moveTo(x,y+s*0.95);ctx.bezierCurveTo(x-s*1.7,y-s*0.05,x-s*0.8,y-s*1.35,x,y-s*0.45);ctx.bezierCurveTo(x+s*0.8,y-s*1.35,x+s*1.7,y-s*0.05,x,y+s*0.95);ctx.closePath();}
+function drawHeart(x,y,s,a=1){ctx.globalAlpha=a;heartPath(x,y,s);ctx.fillStyle='#e53935';ctx.fill();ctx.lineWidth=3;ctx.strokeStyle='#fff';ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,.55)';ctx.beginPath();ctx.ellipse(x-s*0.5,y-s*0.45,s*0.22,s*0.14,-0.6,0,7);ctx.fill();ctx.globalAlpha=1;}
+/* Füll-Anzeige (Ring) um ein Rad + kleiner Wassertropfen als Hinweis "hier spritzen" */
+function drawFillRing(q,r,tr){ctx.lineWidth=8;ctx.strokeStyle='rgba(0,0,0,.35)';ctx.beginPath();ctx.arc(q.x,q.y,r+9,0,7);ctx.stroke();
+  const f=tr.fill/tr.need;if(f>0){ctx.strokeStyle=tr.done?'#69f0ae':'#4fc3f7';ctx.beginPath();ctx.arc(q.x,q.y,r+9,-Math.PI/2,-Math.PI/2+f*Math.PI*2);ctx.stroke();}
+  if(!tr.done){const b=Math.sin(performance.now()/180)*5,dy=q.y-r-34+b;ctx.fillStyle='#4fc3f7';ctx.strokeStyle='#fff';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(q.x,dy-15);
+    ctx.quadraticCurveTo(q.x+11,dy,q.x+9,dy+5);ctx.arc(q.x,dy+5,9,0,Math.PI);ctx.quadraticCurveTo(q.x-11,dy,q.x,dy-15);ctx.fill();ctx.stroke();}}
+function drawPost(x,top,col='#6d4c41'){const gy=groundY(x);ctx.fillStyle=col;ctx.fillRect(x-6,top,12,gy-top);ctx.fillStyle='rgba(0,0,0,.2)';ctx.fillRect(x+2,top,4,gy-top);}
+/* kleines Rädchen (Zahnrad) in der Farbe seines Tores */
+function drawWheel(tr,col){const q=trigPos(tr),r=TRIG_T.wheel.r;drawPost(tr.x,q.y,'#78909c');
+  ctx.save();ctx.translate(q.x,q.y);ctx.rotate(tr.spin);ctx.fillStyle=col;
+  for(let k=0;k<8;k++){ctx.save();ctx.rotate(k*Math.PI/4);ctx.fillRect(-6,-r-7,12,10);ctx.restore();}
+  ctx.beginPath();ctx.arc(0,0,r,0,7);ctx.fill();ctx.lineWidth=3;ctx.strokeStyle='#37474f';ctx.stroke();
+  ctx.fillStyle='#eceff1';ctx.beginPath();ctx.arc(0,0,r*0.62,0,7);ctx.fill();ctx.strokeStyle=col;ctx.lineWidth=5;
+  for(let k=0;k<3;k++){ctx.beginPath();ctx.moveTo(-r*0.62*Math.cos(k*Math.PI/3),-r*0.62*Math.sin(k*Math.PI/3));ctx.lineTo(r*0.62*Math.cos(k*Math.PI/3),r*0.62*Math.sin(k*Math.PI/3));ctx.stroke();}
+  ctx.fillStyle='#37474f';ctx.beginPath();ctx.arc(0,0,6,0,7);ctx.fill();ctx.restore();drawFillRing(q,r+4,tr);}
+/* Wasserrad mit Schaufeln */
+function drawWaterwheel(tr){const q=trigPos(tr),r=TRIG_T.waterwheel.r;drawPost(tr.x,q.y);
+  ctx.save();ctx.translate(q.x,q.y);ctx.rotate(tr.spin);ctx.strokeStyle='#5d4037';ctx.lineWidth=6;ctx.beginPath();ctx.arc(0,0,r*0.8,0,7);ctx.stroke();
+  for(let k=0;k<8;k++){ctx.save();ctx.rotate(k*Math.PI/4);ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,-r*0.8);ctx.stroke();ctx.fillStyle='#29b6f6';ctx.fillRect(-9,-r-4,18,20);ctx.strokeStyle='#01579b';ctx.lineWidth=2;ctx.strokeRect(-9,-r-4,18,20);ctx.strokeStyle='#5d4037';ctx.restore();}
+  ctx.fillStyle='#ffca28';ctx.beginPath();ctx.arc(0,0,9,0,7);ctx.fill();ctx.restore();
+  if(tr.hitT>0)for(let k=0;k<2;k++)parts.push({k:'drop',x:q.x+rnd(-r,r),y:q.y+r*0.6,vx:rnd(-40,40),vy:rnd(-40,40),life:0.4,t:0,s:3});
+  drawFillRing(q,r,tr);}
+function chainLine(x0,y0,x1,y1,col,off){const L=Math.hypot(x1-x0,y1-y0),n=Math.floor(L/16),a=Math.atan2(y1-y0,x1-x0);ctx.strokeStyle=col;ctx.lineWidth=3.5;
+  for(let k=0;k<n;k++){const t=(k+(off%1+1)%1)/n;const x=lerp(x0,x1,t),y=lerp(y0,y1,t)+Math.sin(t*Math.PI)*22;ctx.save();ctx.translate(x,y);ctx.rotate(a+(k%2?Math.PI/2:0)*0.0);
+    ctx.beginPath();ctx.ellipse(0,0,8,k%2?3:5,0,0,7);ctx.stroke();ctx.restore();}}
+const CHAL_T={
+ /* Gitter-Tor: blockiert sanft (kein Unfall, kein Herz weg), bis das Rädchen 300 px davor nass genug ist; dann fährt es hoch und bleibt offen */
+ gate:{wd:CH_WD.gate,par:3,
+  make(st,k){const x=Math.round(st+CH_WD.gate-260);return {kind:'gate',x,open:false,lift:0,col:GATE_COLS[k%GATE_COLS.length],hinted:false,bumps:0,trig:mkTrig('wheel',x-300)};},
+  flat(ch,flatten){flatten(ch.x-170,ch.x+150,120);flatten(ch.trig.x-60,ch.trig.x+60,100);},
+  open(ch){ch.open=true;stats.gates++;SFX.gate();lsSet(LS_GATEDONE,1);const gy=groundY(ch.x);addScore(GATE_PTS,ch.x,gy-300,'Tor offen! 🔓','#80deea');
+    for(let k=0;k<16;k++)parts.push({k:'star',x:ch.x+rnd(-40,40),y:gy-rnd(60,260),vx:rnd(-160,160),vy:rnd(-240,-40),life:0.9,t:0,s:rnd(6,11),col:ch.col});
+    if(hintT>0&&$('hint').textContent.includes('Rädchen'))showHint('Super! Das Tor geht auf! 🎉',1.6);},
+  update(ch,c,dt,px){trigTick(ch.trig,dt);if(ch.open){ch.lift=Math.min(1,ch.lift+dt/0.9);return;}
+    if(!ch.hinted&&ch.trig.x-c.x<W*0.7){ch.hinted=true;if(!lsGet(LS_GATEDONE,0))showHint('🔒 Gitter-Tor! Spritz Wasser auf das Rädchen! ⚙️💧',3.5);}
+    if(c.x+48>ch.x-18&&px<ch.x+18){c.x=ch.x-18-48;if(c.vx>0)c.vx=-Math.min(200,c.vx*0.45+40);SFX.bump();blockedT=1.5;ch.bumps++;
+      if(!$('hint').textContent.includes('Rädchen')||hintT<=0)showHint('🔒 Zu! Spritz Wasser auf das Rädchen! ⚙️💧',2.2);}},
+  draw(ch){const gy=groundY(ch.x),x=ch.x,top=gy-470,box=gy-250,lift=ch.lift*ch.lift*(3-2*ch.lift)*232,tr=ch.trig,q=trigPos(tr);
+    drawWheel(tr,ch.col);
+    chainLine(q.x+TRIG_T.wheel.r,q.y,x-26,top+60,ch.col,-tr.spin*0.6);
+    // Gitter (fährt in den Kasten hoch)
+    ctx.save();ctx.beginPath();ctx.rect(x-30,box,60,gy-box+5);ctx.clip();
+    const b0=box-lift,b1=gy-lift;ctx.strokeStyle='#546e7a';ctx.lineWidth=7;for(let k=-2;k<=2;k++){ctx.beginPath();ctx.moveTo(x+k*9,b0);ctx.lineTo(x+k*9,b1);ctx.stroke();}
+    ctx.lineWidth=6;ctx.strokeStyle=ch.col;for(let yy=b0+40;yy<b1-10;yy+=55){ctx.beginPath();ctx.moveTo(x-24,yy);ctx.lineTo(x+24,yy);ctx.stroke();}
+    ctx.fillStyle='#455a64';for(let k=-2;k<=2;k++){ctx.beginPath();ctx.moveTo(x+k*9-4,b1);ctx.lineTo(x+k*9,b1+9);ctx.lineTo(x+k*9+4,b1);ctx.fill();}
+    if(!ch.open){ctx.fillStyle=ch.col;rr(x-15,gy-140,30,26,5);ctx.fill();ctx.strokeStyle='#37474f';ctx.lineWidth=4;ctx.beginPath();ctx.arc(x,gy-140,9,Math.PI,0);ctx.stroke();ctx.fillStyle='#37474f';ctx.beginPath();ctx.arc(x,gy-128,4,0,7);ctx.fill();}
+    ctx.restore();
+    // Pfosten + Kasten oben
+    ctx.fillStyle='#607d8b';ctx.fillRect(x-36,top,10,gy-top);ctx.fillRect(x+26,top,10,gy-top);
+    ctx.fillStyle=ch.col;rr(x-42,top,84,box-top,10);ctx.fill();ctx.strokeStyle='#37474f';ctx.lineWidth=4;ctx.stroke();
+    ctx.fillStyle='rgba(0,0,0,.18)';for(let yy=top+18;yy<box-10;yy+=34)ctx.fillRect(x-34,yy,68,10);
+    ctx.save();ctx.translate(x-26,top+60);ctx.rotate(tr.spin*0.6);ctx.fillStyle='#eceff1';ctx.beginPath();ctx.arc(0,0,11,0,7);ctx.fill();ctx.fillStyle=ch.col;ctx.fillRect(-2,-11,4,22);ctx.restore();}},
+ /* Herz-Käfig: über der Strecke; Wasserrad 200 px davor lange genug nass → Käfig auf, Herz fällt, unten fangen (großzügig) */
+ heart:{wd:CH_WD.heart,par:4,
+  make(st){const x=Math.round(st+680);return {kind:'heart',x,open:false,door:0,heart:null,hinted:false,trig:mkTrig('waterwheel',x-200)};},
+  flat(ch,flatten){flatten(ch.x-330,ch.x+240,140);},
+  open(ch){ch.open=true;stats.cages++;SFX.cage();const gy=groundY(ch.x);addScore(CAGE_PTS,ch.x,gy-330,'Käfig offen! 🔓','#f48fb1');ch.heart={x:ch.x,y:gy-255,vy:-80,st:'fall',t:0};},
+  update(ch,c,dt){const tr=ch.trig;trigTick(tr,dt);if(ch.open)ch.door=Math.min(1,ch.door+dt*3);
+    if(!ch.hinted&&tr.x-c.x<W*0.75){ch.hinted=true;if(!lsGet(LS_HEARTDONE,0))showHint('❤️ Herz im Käfig! Spritz lange aufs Wasserrad – langsam fahren hilft!',3.5);}
+    const h=ch.heart;if(!h||h.st==='caught'||h.st==='gone')return;h.t+=dt;
+    if(h.st==='fall'){h.vy+=HEART_G*dt;h.y+=h.vy*dt;const gy=groundY(h.x)-26;if(h.y>=gy){h.y=gy;h.vy=0;h.st='ground';h.t=0;SFX.heartLand();
+      for(let k=0;k<8;k++)parts.push({k:'dust',x:h.x+rnd(-20,20),y:gy+24,vx:rnd(-80,80),vy:rnd(-80,-20),life:0.5,t:0,s:rnd(5,9)});}}
+    else if(h.t>HEART_LINGER+HEART_FADE){h.st='gone';stats.heartsMissed++;return;}
+    if(c.crashT<=0&&Math.abs(h.x-c.x)<HEART_CATCH_X&&h.y>c.y-215&&h.y<c.y+40)catchHeart(ch);},
+  draw(ch){const gy=groundY(ch.x),x=ch.x,cy=gy-255;drawWaterwheel(ch.trig);
+    // Galgen: Pfosten hinter dem Käfig, Arm, Seil
+    drawPost(x+90,gy-345);ctx.fillStyle='#6d4c41';ctx.fillRect(x-6,gy-351,102,12);ctx.strokeStyle='#8d6e63';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x,gy-339);ctx.lineTo(x,cy-34);ctx.stroke();
+    // Schlauch vom Wasserrad zum Käfig (zeigt: das gehört zusammen)
+    const q=trigPos(ch.trig);ctx.strokeStyle='rgba(41,182,246,.8)';ctx.lineWidth=5;ctx.setLineDash([10,8]);ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.quadraticCurveTo((q.x+x)/2,q.y-120,x-34,cy);ctx.stroke();ctx.setLineDash([]);
+    if(!ch.open){const p=1+Math.sin(performance.now()/220)*0.08;drawHeart(x,cy+4,20*p);}
+    ctx.strokeStyle='#ffd54f';ctx.lineWidth=4;rr(x-34,cy-34,68,64,8);ctx.stroke();ctx.fillStyle='#ffb300';ctx.fillRect(x-38,cy-38,76,8);
+    for(let k=-2;k<=2;k++){ctx.beginPath();ctx.moveTo(x+k*13,cy-30);ctx.lineTo(x+k*13,cy+30);ctx.stroke();}
+    // Boden-Klappe: schwingt beim Öffnen nach unten
+    ctx.save();ctx.translate(x-34,cy+30);ctx.rotate(ch.door*1.4);ctx.fillStyle='#ffb300';ctx.fillRect(0,-4,68,8);ctx.restore();},
+  drawFront(ch){const h=ch.heart;if(!h||h.st==='caught'||h.st==='gone')return;let a=1,s=22;
+    if(h.st==='ground'){s=22+Math.sin(h.t*7)*2.5;if(h.t>HEART_LINGER)a=clamp(1-(h.t-HEART_LINGER)/HEART_FADE,0,1);else if(h.t>HEART_LINGER-1.5)a=0.55+0.45*Math.abs(Math.cos(h.t*9));
+      ctx.fillStyle=`rgba(0,0,0,${0.18*a})`;ctx.beginPath();ctx.ellipse(h.x,h.y+26,22,6,0,0,7);ctx.fill();}
+    drawHeart(h.x,h.y,s,a);}}};
+function catchHeart(ch){const h=ch.heart;h.st='caught';stats.hearts++;SFX.heart();lsSet(LS_HEARTDONE,1);
+  if(hearts<MAX_HEARTS){hearts++;addScore(HEART_PTS,h.x,h.y-50,'Extra-Leben! ❤️','#ff80ab');}else addScore(HEART_MAX_PTS,h.x,h.y-50,'Herz-Bonus! ❤️','#ff80ab');
+  for(let k=0;k<18;k++)parts.push({k:'dot',col:k%2?'#ff4081':'#ffcdd2',x:h.x,y:h.y,vx:rnd(-220,220),vy:rnd(-300,-40),life:0.8,t:0,s:rnd(4,8)});
+  const hb=$('hearts');hb.classList.add('bump');clearTimeout(hb._t);hb._t=setTimeout(()=>hb.classList.remove('bump'),300);updateHud();}
 
 /* =================== Level building =================== */
 let lvlPlanInfo=null;
@@ -509,22 +630,28 @@ function buildLevel(w,i){lvlPlanInfo=null;
   const hardRes=reserved.slice();
   cps.forEach(c=>{if(c>0)res(c-SZ.c[0],c+SZ.c[1]);});
   res(L.len-300,total);
-  const ramps=[],zones=[],lasers=[],obstacles=[];
+  const ramps=[],zones=[],lasers=[],obstacles=[],challenges=[];
+  /* Herausforderung (Tor / Herz-Käfig) in ein freies Stück ab st setzen: belegt [st, st+CH_WD] wie ein Hindernis */
+  const placeCh=(kind,st)=>{const T=CHAL_T[kind];const ch=T.make(st,challenges.filter(q=>q.kind===kind).length);T.flat(ch,flatten);challenges.push(ch);hardRes.push([st,st+T.wd]);};
   if(w===0){
   /* Welt 1: Rampen wie bisher (gleiche Zufallsfolge, gleiche relative Lage) + ergänzte Rampen, Hindernisse jetzt mit dem Planer der neuen Welten */
   for(const r of L.ramps0.concat(L.rampsX)){const x=Math.round(r.f*L.len),len=r.len,ht=r.ht;flatten(x-80,x+len+40,140);
     const k0=Math.round(x/10),k1=Math.round((x+len)/10);for(let k=k0;k<=k1;k++)h[k]+=ht*((k-k0)/(k1-k0));for(let k=k1+1;k<=k1+3;k++)h[k]+=ht*(1-(k-k1)/3);
     ramps.push({x,len,ht});hardRes.push([x-100,x+len+RAMP_LAND]);}
-  const r2=mulberry32(99+i*7);const segs=w1Segs(L);
-  const load=segs.map(()=>0),cnt=segs.map(()=>0),dropped=[];
-  for(let k=0;k<L.obst;k++){let bi=-1,br=-1,wd=520;segs.forEach((g,j)=>{const room=g[1]-g[0]-load[j]-wd;if(room>=0&&room>br){br=room;bi=j;}});
-    if(bi<0){wd=460;segs.forEach((g,j)=>{const room=g[1]-g[0]-load[j]-wd;if(room>=0&&room>br){br=room;bi=j;}});}
-    if(bi<0){dropped.push('obst');continue;}load[bi]+=wd;cnt[bi]++;}
-  segs.forEach((g,j)=>{const n=cnt[j];if(!n)return;const wd=load[j]/n,slack=g[1]-g[0]-load[j];const ws=Array.from({length:n},()=>0.3+r2());const wsum=ws.reduce((a,b)=>a+b,0)+0.6;let c0=g[0]+slack*0.3/wsum;
-    for(let k=0;k<n;k++){const x=Math.round(c0+wd/2);c0+=wd+slack*ws[k]/wsum;flatten(x-70,x+70,120);
+  const r2=mulberry32(99+i*7);const segs=w1Segs(L);const its=w1ItemList(L);
+  const load=segs.map(()=>0),bins=segs.map(()=>[]),dropped=[];
+  for(const it of its){let bi=-1,br=-1;segs.forEach((g,j)=>{const room=g[1]-g[0]-load[j]-it.wd;if(room>=0&&room>br){br=room;bi=j;}});
+    if(bi<0&&it.k==='obst'){it.wd=460;segs.forEach((g,j)=>{const room=g[1]-g[0]-load[j]-it.wd;if(room>=0&&room>br){br=room;bi=j;}});}
+    if(bi<0){dropped.push(it.k);continue;}load[bi]+=it.wd;bins[bi].push(it);}
+  segs.forEach((g,j)=>{const bin=bins[j],n=bin.length;if(!n)return;const mixed=bin.some(it=>it.k!=='obst');
+    if(mixed)for(let k=n-1;k>0;k--){const q=Math.floor(r2()*(k+1));[bin[k],bin[q]]=[bin[q],bin[k]];}
+    const slack=g[1]-g[0]-load[j];const ws=Array.from({length:n},()=>0.3+r2());const wsum=ws.reduce((a,b)=>a+b,0)+0.6;let c0=g[0]+slack*0.3/wsum;
+    for(let k=0;k<n;k++){const it=bin[k],wd=mixed?it.wd:load[j]/n;
+      if(it.k!=='obst'){placeCh(it.k,c0);c0+=wd+slack*ws[k]/wsum;continue;}
+      const x=Math.round(c0+wd/2);c0+=wd+slack*ws[k]/wsum;flatten(x-70,x+70,120);
       const OL=WD.obst;const T=OL[Math.floor(rng()*OL.length)];const big=i>=2&&rng()<0.4&&!T.flat?1.2:1;obstacles.push({x,t:T.t,w:T.w*big,h:T.h*big,flat:!!T.flat,passed:false});}});
   obstacles.sort((a,b)=>a.x-b.x);
-  lvlPlanInfo={free:segs.reduce((t,g)=>t+g[1]-g[0],0),need:L.obst*520,dropped};
+  lvlPlanInfo={free:segs.reduce((t,g)=>t+g[1]-g[0],0),need:its.reduce((t,it)=>t+it.wd,0),dropped};
   } else {
   /* ---- planner for new worlds: fill free stretches between fires/checkpoints in order ---- */
   const r2=mulberry32(99+w*31+i*7);
@@ -532,6 +659,7 @@ function buildLevel(w,i){lvlPlanInfo=null;
   fixed.sort((p,q)=>p[0]-q[0]);const segs=[];let cur=0;for(const [p0,p1] of fixed){if(p0>cur)segs.push([cur,p0]);cur=Math.max(cur,p1);}
   const items=[];for(let k=0;k<L.ramps;k++){const len=240+rng()*80;items.push({k:'ramp',len,ht:70+rng()*45,wd:len+RAMP_LAND+100});}
   for(let k=0;k<L.obst;k++)items.push({k:'obst',wd:520});for(let k=0;k<(L.lasers||0);k++)items.push({k:'laser',wd:600});
+  for(let k=0;k<(L.hearts||0);k++)items.push({k:'heart',wd:CH_WD.heart});for(let k=0;k<(L.gates||0);k++)items.push({k:'gate',wd:CH_WD.gate});
   const Z=L.zones||{};for(const t of ['mud','river'])for(let k=0;k<(Z[t]||0);k++){const zlen=Math.round(t==='mud'?220+r2()*100:180+r2()*60);items.push({k:'zone',type:t,zlen,wd:zlen+300});}
   for(let k=items.length-1;k>0;k--){const j=Math.floor(rng()*(k+1));[items[k],items[j]]=[items[j],items[k]];}
   const F=segs.reduce((t,g)=>t+g[1]-g[0],0),need=items.reduce((t,it)=>t+it.wd,0),avgGap=Math.max(0,F-need)/(items.length+segs.length);
@@ -547,6 +675,7 @@ function buildLevel(w,i){lvlPlanInfo=null;
         ramps.push({x,len:it.len,ht:it.ht});hardRes.push([x-100,x+it.len+RAMP_LAND]);}
       else if(it.k==='obst'){const x=Math.round(st+it.wd/2);flatten(x-70,x+70,120);const OL=WD.obst;const T=OL[Math.floor(rng()*OL.length)];const big=(i>=2||w>=3)&&rng()<0.22+0.04*w&&!T.flat?1.2:1;
         obstacles.push({x,t:T.t,w:T.w*big,h:T.h*big,flat:!!T.flat,passed:false});}
+      else if(it.k==='heart'||it.k==='gate')placeCh(it.k,st);
       else if(it.k==='laser'){const x=Math.round(st+300);flatten(x-90,x+90,120);lasers.push({x,period:3.2,on:1.3,phase:r2()*3.2,hinted:false});hardRes.push([x-250,x+250]);}
       else{const x0=Math.round(st+150);flatten(x0,x0+it.zlen,110);zones.push({x0,x1:x0+it.zlen,type:it.type,hinted:false});hardRes.push([x0-150,x0+it.zlen+150]);}
   }
@@ -557,7 +686,8 @@ function buildLevel(w,i){lvlPlanInfo=null;
   zones.sort((p,q)=>p.x0-q.x0);
   lvlPlanInfo={free:F,need,dropped};
   }
-  return {L,h,N,fires,obstacles,cps,cpReached:cps.map((c,j)=>j===0),ramps,finish:L.len,bossX,total,zones,lasers,world:w,plan:lvlPlanInfo};
+  challenges.sort((p,q)=>p.x-q.x);
+  return {L,h,N,fires,obstacles,cps,cpReached:cps.map((c,j)=>j===0),ramps,finish:L.len,bossX,total,zones,lasers,challenges,world:w,plan:lvlPlanInfo};
 }
 function hAt(x){const f=x/10;let k=Math.floor(f);if(k<0)return lvl.h[0];if(k>=lvl.N-1)return lvl.h[lvl.N-1];const t=f-k;return lvl.h[k]*(1-t)+lvl.h[k+1]*t;}
 const groundY=x=>BASE-hAt(x);
@@ -566,9 +696,9 @@ const slope=x=>(groundY(x+6)-groundY(x-6))/12;
 /* =================== Run / level flow =================== */
 function showScreen(id){['sTitle','sWorld','sMap','sWerk','sSelect','sLevel','sEnd','sHs','sSettings'].forEach(s=>$(s).classList.toggle('hidden',s!==id));
   const playing=id===null;$('hud').classList.toggle('hidden',!playing);$('controls').classList.toggle('hidden',!playing);$('progress').classList.toggle('hidden',!playing);if(!playing)$('hint').classList.add('hidden');}
-function startRun(vi,startLevel=0,w=0){worldIdx=w|0;vehIdx=vi;veh=VEHICLES[vi];score=0;runId=Date.now();stats.jumps=stats.fires=stats.obst=stats.saltos=stats.wobbles=0;landLog=[];startLevel=startLevel|0;startLevelPlay(startLevel);}
+function startRun(vi,startLevel=0,w=0){worldIdx=w|0;vehIdx=vi;veh=VEHICLES[vi];score=0;runId=Date.now();stats.jumps=stats.fires=stats.obst=stats.saltos=stats.wobbles=stats.gates=stats.cages=stats.hearts=stats.heartsMissed=0;landLog=[];startLevel=startLevel|0;startLevelPlay(startLevel);}
 function startLevelPlay(i){
-  levelIdx=i;markReached(worldIdx,i);refreshCos();lvl=buildLevel(worldIdx,i);theme=THEMES[lvl.L.theme];hearts=3;crashes=0;levelTime=0;maxX=0;lastCp=0;distAcc=0;levelStartScore=score;
+  levelIdx=i;markReached(worldIdx,i);refreshCos();lvl=buildLevel(worldIdx,i);theme=THEMES[lvl.L.theme];hearts=MAX_HEARTS;crashes=0;levelTime=0;maxX=0;lastCp=0;distAcc=0;levelStartScore=score;
   parts=[];water=[];pops=[];fireballs=[];hintT=0;blockedT=0;
   const BT=lvl.bossX?BOSS_T[WORLDS[worldIdx].boss]:null;
   boss=BT?{type:WORLDS[worldIdx].boss,BT,x:lvl.bossX,hp:BT.hp,maxHp:BT.hp,active:false,throwT:2.2,mouth:0,flash:0,defeated:false,fleeX:0,introT:0}:null;
@@ -581,7 +711,7 @@ function startLevelPlay(i){
 function spawnCar(x){car={x:x+60,y:groundY(x+60),vx:0,vy:0,ang:0,onGround:true,air:0,crashT:0,inv:1.2,wheel:0,aimAng:-0.3,spraying:false,angV:0,flip:0,spin:0,rampJump:false,kickT:0,wob:0};}
 function addScore(n,x,y,label,color){score=Math.max(0,score+n);if(x!=null)pops.push({x,y,text:(label?label+' ':'')+(n>=0?'+':'')+n,color:color||(n>=0?'#ffeb3b':'#ff5252'),t:0,big:Math.abs(n)>=300});
   const sb=$('scoreBox');sb.classList.add('bump');clearTimeout(sb._t);sb._t=setTimeout(()=>sb.classList.remove('bump'),130);updateHud();}
-function updateHud(){$('score').textContent=fmt(score);$('hearts').textContent='❤️'.repeat(Math.max(0,hearts))+'🤍'.repeat(Math.max(0,3-hearts));
+function updateHud(){$('score').textContent=fmt(score);$('hearts').textContent='❤️'.repeat(Math.max(0,hearts))+'🤍'.repeat(Math.max(0,MAX_HEARTS-hearts));
   if(lvl){const p=clamp(car.x/lvl.finish,0,1);$('progFill').style.width=(p*100)+'%';$('progCar').style.left=(p*100)+'%';}}
 function showHint(t,dur){const el=$('hint');el.textContent=t;el.classList.remove('hidden');hintT=dur;}
 
@@ -606,7 +736,7 @@ let lastStars=null;
 function levelComplete(){
   state='levelDone';setEngine(false,0);setSpray(false);
   const L=lvl.L, nf=L.fires.length;
-  const par=Math.round(lvl.finish/240+nf*4+(L.boss?18:0));
+  const par=Math.round(lvl.finish/240+nf*4+(L.boss?18:0)+lvl.challenges.reduce((t,ch)=>t+CHAL_T[ch.kind].par,0)); // + Zeit für Tore/Herz-Käfige
   const lvB=500+250*levelIdx, timeB=Math.max(0,Math.round((par-levelTime)*20/10)*10), cleanB=crashes===0?300:0;
   const before=WORLDS.map((_,w)=>isUnlocked(w));
   score+=lvB+timeB+cleanB;updateHud();
@@ -674,6 +804,7 @@ const LS_UNL='dinoAutoSpiel.unlocked.v1', LS_UNL_MIG='dinoAutoSpiel.unlockMigrat
 const LEGACY_NEED=[16650,19260,20790,21600]; // 90 %-Ziele der Version 2.0 (vor der Welt-1-Hindernis-Korrektur)
 const LEGACY_NEED2=[24840,19260,20790,21600], LS_UNL_MIG3='dinoAutoSpiel.unlockMigrated.v3'; // 90 %-Ziele nach der Hindernis-Korrektur (vor den ergänzten Welt-1-Rampen)
 const LEGACY_NEED3=[26460,19260,20790,21600], LS_UNL_MIG4='dinoAutoSpiel.unlockMigrated.v4'; // 90 %-Ziele vor Sternen & Saltos (Version 2.2)
+const LEGACY_NEED4=[38790,27270,27900,29700], LS_UNL_MIG5='dinoAutoSpiel.unlockMigrated.v5'; // 90 %-Ziele vor Gitter-Toren & Herz-Käfigen (Version 2.3)
 /* ---- Sterne, Level-Bestwerte, erreichte Level, Endgegner-Siege ---- */
 const LS_STARS='dinoAutoSpiel.stars.v1', LS_LVBEST='dinoAutoSpiel.levelBest.v1', LS_REACH='dinoAutoSpiel.reached.v1', LS_BOSS='dinoAutoSpiel.bossWins.v1',
   LS_COS='dinoAutoSpiel.cosmetic.v1', LS_COSSEEN='dinoAutoSpiel.cosSeen.v1', LS_SALTO='dinoAutoSpiel.saltoDone.v1';
@@ -698,10 +829,11 @@ function loadUnl(){try{const a=JSON.parse(localStorage.getItem(LS_UNL)||'[]');re
 function addUnl(w){const a=loadUnl();if(!a.includes(w)){a.push(w);a.sort();try{localStorage.setItem(LS_UNL,JSON.stringify(a));}catch(e){}}}
 /* Nach „Alles zurücksetzen“ darf keine alte Migration wieder etwas freischalten */
 const LS_RESET='dinoAutoSpiel.resetDone.v1';
-function migrateUnlocks(){try{if(localStorage.getItem(LS_RESET)){[LS_UNL_MIG,LS_UNL_MIG3,LS_UNL_MIG4].forEach(k=>localStorage.setItem(k,'1'));return;}const b=loadBest();
+function migrateUnlocks(){try{if(localStorage.getItem(LS_RESET)){[LS_UNL_MIG,LS_UNL_MIG3,LS_UNL_MIG4,LS_UNL_MIG5].forEach(k=>localStorage.setItem(k,'1'));return;}const b=loadBest();
   if(!localStorage.getItem(LS_UNL_MIG)){for(let w=1;w<WORLDS.length;w++)if(b[w-1]>=LEGACY_NEED[w-1])addUnl(w);localStorage.setItem(LS_UNL_MIG,'1');}
   if(!localStorage.getItem(LS_UNL_MIG3)){for(let w=1;w<WORLDS.length;w++)if(b[w-1]>=LEGACY_NEED2[w-1])addUnl(w);localStorage.setItem(LS_UNL_MIG3,'1');}
-  if(!localStorage.getItem(LS_UNL_MIG4)){for(let w=1;w<WORLDS.length;w++)if(b[w-1]>=LEGACY_NEED3[w-1])addUnl(w);localStorage.setItem(LS_UNL_MIG4,'1');}}catch(e){}}
+  if(!localStorage.getItem(LS_UNL_MIG4)){for(let w=1;w<WORLDS.length;w++)if(b[w-1]>=LEGACY_NEED3[w-1])addUnl(w);localStorage.setItem(LS_UNL_MIG4,'1');}
+  if(!localStorage.getItem(LS_UNL_MIG5)){for(let w=1;w<WORLDS.length;w++)if(b[w-1]>=LEGACY_NEED4[w-1])addUnl(w);localStorage.setItem(LS_UNL_MIG5,'1');}}catch(e){}}
 function isUnlocked(w,best){if(w===0)return true;if(loadUnl().includes(w))return true;best=best||loadBest();const ok=best[w-1]>=needPts(w-1)||starsIn(w-1)>=STAR_NEED;if(ok)addUnl(w);return ok;}
 function updateBest(){const b0=loadBest();const before=WORLDS.map((_,w)=>isUnlocked(w,b0));const b=b0.slice();if(Math.round(score)>b[worldIdx]){b[worldIdx]=Math.round(score);saveBest(b);}
   return WORLDS.findIndex((_,w)=>!before[w]&&isUnlocked(w,b));}
@@ -751,12 +883,16 @@ function aimTarget(){
   if(aimPtrs.size){const p=[...aimPtrs.values()].pop();const w=toWorld(p.cx,p.cy);let best=null,bd=230;
     for(const f of lvl.fires)if(!f.out){const fy=groundY(f.x)-f.h*0.45*fireScale(f);const d=Math.hypot(w.x-f.x,w.y-fy);if(d<bd){bd=d;best={x:f.x,y:fy};}}
     for(const b of fireballs){const d=Math.hypot(w.x-b.x,w.y-b.y);if(d<bd){bd=d;best={x:b.x+b.vx*0.25,y:b.y+b.vy*0.25};}}
+    for(const ch of lvl.challenges)if(!ch.trig.done){const q=trigPos(ch.trig);const d=Math.hypot(w.x-q.x,w.y-q.y);if(d<bd){bd=d;best=q;}}
     if(boss&&boss.active&&!boss.defeated){const bx=boss.x,by=groundY(boss.x)-150;if(Math.abs(w.x-bx)<200&&Math.abs(w.y-by)<200)best=best||{x:bx-20,y:by};}
     return {pt:best||w,manual:true};}
   if(!input.water)return null;
   let best=null,bd=1e9;
   for(const b of fireballs){const dx=b.x-car.x;if(dx>-60&&dx<1000){const d=Math.abs(dx);if(d<bd){bd=d;best={x:b.x+b.vx*0.3,y:b.y+b.vy*0.3};}}}
+  const fb=!!best;
   if(!best)for(const f of lvl.fires)if(!f.out){const dx=f.x-car.x;if(dx>-40&&dx<800&&dx<bd){bd=dx;best={x:f.x-f.w*0.15,y:groundY(f.x)-f.h*0.35*fireScale(f)};}}
+  // Rädchen / Wasserrad: Rädchen vor einem Tor auch nach hinten (Auto steht am Tor), Wasserrad nur nach vorn
+  if(!fb)for(const ch of lvl.challenges){const tr=ch.trig;if(tr.done)continue;const dx=tr.x-car.x;if(dx>-TRIG_T[tr.type].back&&dx<800&&Math.abs(dx)<bd){bd=Math.abs(dx);best=trigPos(tr);}}
   if(!best&&boss&&boss.active&&!boss.defeated&&boss.x-car.x<1100)best={x:boss.x-40,y:groundY(boss.x)-170};
   return {pt:best,manual:false};}
 function nozzlePos(){const [ox,oy]=veh.nozzle;const c=Math.cos(car.ang),s=Math.sin(car.ang);return {x:car.x+ox*c-oy*s,y:car.y+ox*s+oy*c};}
@@ -835,11 +971,14 @@ function update(dt){
     if(laserOn(L)&&px<L.x&&c.x+48>L.x){c.x=L.x-48;if(c.vx>0)c.vx=-Math.min(240,c.vx*0.5+70);zapT=0.25;SFX.zap();
       for(let k=0;k<8;k++)parts.push({k:'spark',x:L.x,y:c.y-rnd(20,90),vx:rnd(-250,50),vy:rnd(-250,100),life:0.35,t:0,s:rnd(6,12)});}}
   zapT=Math.max(0,zapT-dt);
+  for(const ch of lvl.challenges)CHAL_T[ch.kind].update(ch,c,dt,px);
   // level 1 gentle hint when fire comes into view
   for(const f of lvl.fires)if(f.hint&&!f.out&&!f.hinted&&f.x-c.x<W*0.7){f.hinted=true;showHint('🔥 Feuer! Tippe auf das Feuer zum Löschen! (oder WASSER 💧 halten)',4);}
   blockedT=Math.max(0,blockedT-dt);
-  $('bWater').classList.toggle('pulse',blockedT>0||lvl.fires.some(f=>f.hint&&!f.out&&f.x-c.x<W*0.7)||(boss&&boss.active&&!boss.defeated&&!input.water));
+  $('bWater').classList.toggle('pulse',blockedT>0||lvl.challenges.some(ch=>!ch.trig.done&&ch.trig.x-c.x<W*0.6&&ch.trig.x-c.x>-TRIG_T[ch.trig.type].back)||lvl.fires.some(f=>f.hint&&!f.out&&f.x-c.x<W*0.7)||(boss&&boss.active&&!boss.defeated&&!input.water));
   // checkpoints
+  /* geöffnete Tore / Käfige merken sich als Zwischenstopp: nach einem Unfall geht's dahinter weiter (Stück dahinter ist frei) */
+  lvl.challenges.forEach(ch=>{const off=ch.kind==='gate'?140:200;if(ch.open&&!ch.cpSet&&c.x>=ch.x+off){ch.cpSet=true;if(ch.x+off>lastCp)lastCp=ch.x+off;}});
   lvl.cps.forEach((cp,j)=>{if(!lvl.cpReached[j]&&c.x>=cp){lvl.cpReached[j]=true;lastCp=cp;SFX.check();pops.push({x:cp,y:groundY(cp)-150,text:'Checkpoint! 🚩',color:'#69f0ae',t:0,big:true});}});
   // water
   const tgt=aimTarget();c.spraying=!!tgt;setSpray(c.spraying);
@@ -851,6 +990,8 @@ function update(dt){
     if(!dead)for(let j=fireballs.length-1;j>=0;j--){const b=fireballs[j];if(Math.hypot(p.x-b.x,p.y-b.y)<48){b.hp-=veh.dmg;dead=true;SFX.hiss();if(b.hp<=0){fireballs.splice(j,1);addScore(25,b.x,b.y-30,'');SFX.fireOut();for(let k=0;k<12;k++)parts.push({k:'steam',x:b.x,y:b.y,vx:rnd(-80,80),vy:rnd(-100,0),life:1,t:0,s:rnd(10,22)});}break;}}
     if(!dead&&boss&&boss.active&&!boss.defeated){const by=groundY(boss.x);if(p.x>boss.x-150&&p.x<boss.x+150&&p.y>by-300&&p.y<by){dead=true;boss.hp-=veh.dmg;boss.flash=0.12;SFX.hiss();
       if(Math.random()<0.4)parts.push({k:'steam',x:p.x,y:p.y,vx:rnd(-30,30),vy:rnd(-120,-50),life:1,t:0,s:rnd(10,20)});if(boss.hp<=0)defeatBoss();}}
+    if(!dead)for(const ch of lvl.challenges){const tr=ch.trig;if(!tr.done&&trigHit(tr,p)){dead=true;SFX.hiss();trigFeed(ch,veh.dmg/58);
+      if(Math.random()<0.35)parts.push({k:'drop',x:p.x,y:p.y,vx:rnd(-90,90),vy:rnd(-160,-40),life:0.5,t:0,s:3});break;}}
     if(!dead&&p.y>groundY(p.x)){dead=true;if(Math.random()<0.3)parts.push({k:'drop',x:p.x,y:groundY(p.x),vx:rnd(-60,60),vy:rnd(-150,-60),life:0.4,t:0,s:3});}
     if(dead)water.splice(i,1);}
   if(water.length>400)water.splice(0,water.length-400);
@@ -903,10 +1044,12 @@ function render(){
   drawSky();
   ctx.save();ctx.translate(-camX,-camY);
   drawGround();drawZones();drawRamps();drawCps();drawFinish();drawLasers();
+  for(const ch of lvl.challenges)if(ch.x>camX-500&&ch.trig.x<camX+W+300)CHAL_T[ch.kind].draw(ch);
   for(const o of lvl.obstacles)if(o.x>camX-150&&o.x<camX+W+150)drawObstacle(o);
   for(const f of lvl.fires)if(f.x>camX-300&&f.x<camX+W+300)drawFireBase(f);
   if(boss)drawBoss();
   drawCar();
+  for(const ch of lvl.challenges)if(CHAL_T[ch.kind].drawFront&&ch.x>camX-500&&ch.x<camX+W+500)CHAL_T[ch.kind].drawFront(ch);
   ctx.globalCompositeOperation='lighter';
   for(const f of lvl.fires)if(!f.out&&f.x>camX-300&&f.x<camX+W+300){const sc=fireScale(f),gy=groundY(f.x);if(!burns(f))continue;const gc=GLOW[f.style]||GLOW.fire;const g=ctx.createRadialGradient(f.x,gy-f.h*0.4*sc,5,f.x,gy-f.h*0.4*sc,f.h*sc+60);g.addColorStop(0,gc[0]);g.addColorStop(1,gc[1]);ctx.fillStyle=g;ctx.fillRect(f.x-f.h-80,gy-f.h*2-80,f.h*2+160,f.h*2+160);}
   for(const p of parts)if(p.k==='flame'){const a=1-p.t/p.life;const r=p.s*(0.4+a*0.6);const P=FLAME[p.c]||FLAME.fire;ctx.fillStyle=`rgba(${a>0.6?P[0]:a>0.3?P[1]:P[2]},${a})`;ctx.beginPath();ctx.arc(p.x,p.y,r,0,7);ctx.fill();}
@@ -1357,7 +1500,7 @@ function confirmBox(text,yes,no,o){o=o||{};$('cfText').textContent=text;$('cfYes
 const RESET_KEEP=[LS_MUSIC,LS_NAME];
 function resetAll(){try{const ks=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith('dinoAutoSpiel.')&&!RESET_KEEP.includes(k))ks.push(k);}
   ks.forEach(k=>localStorage.removeItem(k));
-  [LS_UNL_MIG,LS_UNL_MIG3,LS_UNL_MIG4].forEach(k=>localStorage.setItem(k,'1'));localStorage.setItem(LS_RESET,String(Date.now()));}catch(e){}
+  [LS_UNL_MIG,LS_UNL_MIG3,LS_UNL_MIG4,LS_UNL_MIG5].forEach(k=>localStorage.setItem(k,'1'));localStorage.setItem(LS_RESET,String(Date.now()));}catch(e){}
   worldIdx=0;levelIdx=0;mapLevel=0;lvl=null;refreshCos();return true;}
 function setSetMusic(){$('btnSetMusic').textContent=musicOn?'🎵 An':'🔇 Aus';$('btnSetMusic').className='btn '+(musicOn?'blue':'gray');}
 function showSettings(){setSetMusic();showScreen('sSettings');}
@@ -1375,6 +1518,8 @@ $('btnReset').onclick=()=>{SFX.click();
 if(TEST){window.__game={get crashLog(){return crashLog},get levelTime(){return levelTime},get worldIdx(){return worldIdx},WORLDS,WORLD_MAX,loadBest,saveBest,isUnlocked,loadUnl,migrateUnlocks,needPts,laserOn,zoneAt,buildWorlds,starMask,levelStars,starsIn,totalStars,saveStars,levelBest,reachedLevel,bossWins,HATS,PAINTS,cosUnlocked,loadCos,saveCos,newCosmetics,showMap,showWerk,werkPick,get drawCos(){return drawCos},get lastStars(){return lastStars},get landLog(){return landLog},STAR_NEED,RAMP_LAND,resetAll,showSettings,get musicOn(){return musicOn},FLIP_T,SALTO_PTS,wrapAng,get mapLevel(){return mapLevel},get state(){return state},get car(){return car},get lvl(){return lvl},get boss(){return boss},get score(){return score},set score(v){score=v},get hearts(){return hearts},get levelIdx(){return levelIdx},
   get fireballs(){return fireballs},input,startRun,startLevelPlay,update,loadHs,stats,endRun,qualifies,crash,
   setManual(m){manual=m},step(sec,ctl){const n=Math.round(sec*60);for(let i=0;i<n;i++){if(ctl)ctl();update(1/60);if(state!=='play')return i;}return n;},
+  get challenges(){return lvl?lvl.challenges:[]},CHAL_T,TRIG_T,CH_GATES,CH_HEARTS,MAX_HEARTS,HEART_LINGER,HEART_FADE,GATE_PTS,CAGE_PTS,HEART_PTS,HEART_MAX_PTS,trigFeed,trigPos,
+  set hearts(v){hearts=v;updateHud();},get veh(){return veh},get lastCp(){return lastCp},get hint(){return hintT>0?$('hint').textContent:''},
   teleport(x){car.x=x;car.y=groundY(x);car.vx=0;car.vy=0;car.onGround=true;maxX=Math.max(maxX,x);camX=x-W*0.3;camY=car.y-H*0.62;},groundY};}
 </script>
 </body>
