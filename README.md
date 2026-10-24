@@ -15,6 +15,14 @@ Ein kindgerechtes Auto-Spiel für Tablet (Touch) und Browser – einfach `index.
 - **❤️ Herz-Käfige:** Über der Strecke hängt ein Herz im Käfig, davor ein **Wasserrad**. Es braucht ca. 1,5–2 Sekunden Wasser – im Vorbeirasen reicht es nicht, also **langsamer fahren oder kurz anhalten**.
   Dann geht der Käfig auf, das Herz fällt herunter – einfach **drunter fahren** und fangen (großzügig). Verpasste Herzen liegen noch ein paar Sekunden auf der Strecke und verblassen dann.
   Ein gefangenes Herz gibt **+1 Leben** (höchstens 3) – sind schon alle 3 Herzen voll, gibt es stattdessen den **Herz-Bonus**.
+- **🌟 Welt-Herz-Maschinen** (jede Welt hat ihre eigene – sie ersetzen 2 der 4 Herz-Käfige, 1 Wasserrad-Käfig bleibt mindestens):
+  - 🌋 **Dampf-Geysir (Welt 1):** Wasser ins glühende Lava-Loch spritzen → eine Dampf-Säule zischt hoch. **Hineinfahren** – der Dampf hebt das Auto hoch zum Herz. Der Dampf hält 4,5 s; wer ihn verpasst, spritzt einfach nochmal.
+  - 🧊 **Eisblock (Welt 2):** Über der Flugbahn einer Rampe hängt ein Herz im Eis. Es schmilzt **nur durch Wasser, das man im Sprung über diese Rampe spritzt** (Springen + Wasser gleichzeitig halten geht; Salto nicht nötig). Das Herz fällt in die Landezone.
+  - 🌱 **Blatt-Katapult (Welt 3):** Den Samen gießen → ein federndes Blatt wächst. Drauffahren → das Blatt schleudert das Auto durch das hängende Herz.
+  - 🧪 **Reagenzglas (Welt 4):** Langsam fahren oder anhalten und lange hineinspritzen – die Flüssigkeit steigt **lila → blau → grün**, dann schwebt das Herz heraus und rollt zum Auto. Im Vorbeirasen zählt das Wasser kaum.
+  - ⚡ **Stromkreis (Welt 5):** Den Strahl ca. 1,2 s zwischen die zwei Kupfer-Kugeln halten (Funken!) – kurze Spritzer reichen nicht, die Ladung geht wieder weg. Dann lässt der Magnet den Herz-Käfig los.
+  Freigelassene Herzen schweben bzw. rollen sanft zum Auto und werden großzügig gefangen; verpasste Herzen kosten nichts extra. Beim ersten Mal erklärt ein kurzer Hinweis, was zu tun ist.
+  Punkte wie beim Käfig: **+150** beim Auslösen, **+250** fürs Herz.
 - Geöffnete Tore und Käfige sind kleine Zwischenstopps: nach einem Unfall geht es direkt dahinter weiter.
 - 🎵 Musik oben rechts an/aus – jede Welt hat ihre eigene Melodie
 
@@ -29,23 +37,23 @@ Ein kindgerechtes Auto-Spiel für Tablet (Touch) und Browser – einfach `index.
 
 Jeder Endgegner wird mit **Wasser 💧** besiegt.
 
-Gitter-Tore und Herz-Käfige pro Level (Level 1–5; nie in der Boss-Arena, nie auf Feuern, Hindernissen, Rampen/Landezonen, Checkpoints, Laser- oder Rutsch-/Matsch-Zonen):
+Gitter-Tore, Herz-Käfige und Welt-Herz-Maschinen pro Level (Level 1–5; nie in der Boss-Arena, nie auf Feuern, Hindernissen, Rampen/Landezonen, Checkpoints, Laser- oder Rutsch-/Matsch-Zonen – nur der Eisblock hängt absichtlich über einer Rampen-Landezone):
 
-| Welt | 🔒 Tore | ❤️ Käfige |
-|---|---|---|
-| 1 | 0 / 0 / 1 / 1 / 0 (2) | 0 / 1 / 1 / 1 / 1 (4) |
-| 2 | 0 / 1 / 1 / 1 / 0 (3) | 1 / 1 / 0 / 1 / 1 (4) |
-| 3 | 0 / 1 / 1 / 2 / 0 (4) | 1 / 0 / 1 / 1 / 1 (4) |
-| 4 | 1 / 1 / 1 / 2 / 0 (5) | 1 / 1 / 0 / 1 / 1 (4) |
-| 5 | 1 / 1 / 2 / 2 / 0 (6) | 1 / 0 / 1 / 1 / 1 (4) |
+| Welt | 🔒 Tore | ❤️ Wasserrad-Käfige | 🌟 Maschine |
+|---|---|---|---|
+| 1 | 0 / 0 / 1 / 1 / 0 (2) | 0 / 1 / 0 / 0 / 1 (2) | 🌋 Geysir in Level 3 + 4 |
+| 2 | 0 / 1 / 1 / 1 / 0 (3) | 1 / 0 / 0 / 0 / 1 (2) | 🧊 Eisblock in Level 2 + 4 |
+| 3 | 0 / 1 / 1 / 2 / 0 (4) | 1 / 0 / 0 / 0 / 1 (2) | 🌱 Blatt-Katapult in Level 3 + 4 |
+| 4 | 1 / 1 / 1 / 2 / 0 (5) | 1 / 0 / 0 / 0 / 1 (2) | 🧪 Reagenzglas in Level 2 + 4 |
+| 5 | 1 / 1 / 2 / 2 / 0 (6) | 1 / 0 / 0 / 0 / 1 (2) | ⚡ Stromkreis in Level 3 + 4 |
 
-Im Boss-Level liegt der Käfig vor der Arena. Die Level sind dafür etwas länger geworden.
+Im Boss-Level liegt der Käfig vor der Arena. Die Level sind dafür etwas länger geworden (die Eis-Level 2-2 und 2-4 dafür wieder etwas kürzer, weil der Eisblock keinen eigenen Platz braucht).
 
 ## ⭐ Sterne & Level-Karte
 Jedes der 25 Level hat **3 Sterne**:
 1. ⭐ **Ziel erreicht**
 2. ⭐ **Schnell:** alle Feuer gelöscht (im Boss-Level: Endgegner besiegt) und im **Zeit-Ziel** angekommen (die Zeit steht auf dem Stern; es ist dieselbe Zeit wie beim Zeit-Bonus).
-   Für jedes Gitter-Tor gibt es 3 s und für jeden Herz-Käfig 4 s extra Zeit (Anhalten und Spritzen ist also kein Nachteil).
+   Für jedes Gitter-Tor gibt es 3 s und für jeden Herz-Käfig 4 s extra Zeit, für Geysir und Blatt-Katapult je 5 s, Reagenzglas und Stromkreis je 4 s, Eisblock 1 s (Anhalten und Spritzen ist also kein Nachteil).
    Weil man ein brennendes Feuer nicht überholen kann, ist „alle Feuer gelöscht“ beim Ziel immer erfüllt – darum zählt hier zusätzlich die Zeit.
 3. ⭐ **Ohne Unfall** (auch kein Treffer vom Endgegner)
 
@@ -56,15 +64,15 @@ Die nächste Welt öffnet sich, sobald du in der Welt davor **90 % der Höchstpu
 
 | Welt | Höchstpunkte | 90 % nötig für die nächste Welt | oder |
 |---|---|---|---|
-| 1 Abenteuer-Land | 46.400 | 41.760 | 10 ⭐ in Welt 1 |
-| 2 Eiswelt | 33.800 | 30.420 | 10 ⭐ in Welt 2 |
-| 3 Dschungelwelt | 35.100 | 31.590 | 10 ⭐ in Welt 3 |
-| 4 Chemiewelt | 37.100 | 33.390 | 10 ⭐ in Welt 4 |
+| 1 Abenteuer-Land | 46.900 | 42.210 | 10 ⭐ in Welt 1 |
+| 2 Eiswelt | 33.300 | 29.970 | 10 ⭐ in Welt 2 |
+| 3 Dschungelwelt | 35.600 | 32.040 | 10 ⭐ in Welt 3 |
+| 4 Chemiewelt | 37.000 | 33.300 | 10 ⭐ in Welt 4 |
 | 5 Elektrowelt | 37.700 | – | – |
 
-Die Höchstpunkte entsprechen einer fehlerfreien, schnellen Fahrt (alle Hindernisse, alle Feuer gelöscht, alle Tore und Käfige geöffnet, alle Herzen gefangen, Boss besiegt, kein Unfall, Doppel-Salto über jede Rampe).
+Die Höchstpunkte entsprechen einer fehlerfreien, schnellen Fahrt (alle Hindernisse, alle Feuer gelöscht, alle Tore, Käfige und Maschinen geöffnet, alle Herzen gefangen, Boss besiegt, kein Unfall, Doppel-Salto über jede Rampe).
 Mit sauberen einfachen Saltos, etwas Zögern und einem Unfall schafft man die 90 % trotzdem – und die 10 Sterne gehen ganz ohne Saltos.
-Eine einmal freigeschaltete Welt bleibt freigeschaltet (auch wer die früheren, niedrigeren Ziele geschafft hat – zuletzt 38.790 / 27.270 / 27.900 / 29.700 –, behält seine Welten).
+Eine einmal freigeschaltete Welt bleibt freigeschaltet (auch wer die früheren, niedrigeren Ziele geschafft hat – zuletzt 41.760 / 30.420 / 31.590 / 33.390, davor 38.790 / 27.270 / 27.900 / 29.700 –, behält seine Welten).
 
 ## 🎨 Dino-Werkstatt
 Nur zum Anschauen – keine Extra-Kräfte. Wird automatisch freigeschaltet:
@@ -83,7 +91,7 @@ Nur zum Anschauen – keine Extra-Kräfte. Wird automatisch freigeschaltet:
 Die Auswahl wird gespeichert und in allen Leveln gezeigt.
 
 ## Punkte
-Strecke, geschaffte Hindernisse (+50), Sprünge (je länger in der Luft, desto mehr), Saltos (+400 / +550), gelöschte Feuer (+100), Gitter-Tor geöffnet (+100), Herz-Käfig geöffnet (+150), Herz gefangen (+250 – egal ob als Extra-Leben oder als Herz-Bonus bei vollen Herzen),
+Strecke, geschaffte Hindernisse (+50), Sprünge (je länger in der Luft, desto mehr), Saltos (+400 / +550), gelöschte Feuer (+100), Gitter-Tor geöffnet (+100), Herz-Käfig oder Welt-Maschine geöffnet (+150), Herz gefangen (+250 – egal ob als Extra-Leben oder als Herz-Bonus bei vollen Herzen),
 Level-Bonus, Zeit-Bonus, „Ohne Unfall“-Bonus (+300) und Endgegner besiegt (+3.000). Ein Unfall kostet 50 Punkte.
 
 ## Bestenliste
@@ -94,5 +102,5 @@ Tastatur (PC): Pfeiltasten / Leertaste, Wasser mit **X** oder **F**.
 ## ⚙️ Einstellungen
 Im Hauptmenü unter **⚙️ Einstellungen**: Musik an/aus (wie der 🎵-Knopf im Spiel) und **🗑 Alles zurücksetzen**.
 Zurücksetzen fragt zweimal nach („Wirklich alles löschen? …“ → „Ganz sicher?“, der Ja-Knopf ist dabei kurz gesperrt und wechselt die Seite), damit es nicht aus Versehen passiert.
-Gelöscht werden: Sterne, Level-Bestwerte, Level-Karte, Welt-Freischaltungen (nur Welt 1 bleibt offen), Endgegner-Siege, Werkstatt-Sachen und -Auswahl, Salto-/Tor-/Herz-Hinweise und alle Bestenlisten.
+Gelöscht werden: Sterne, Level-Bestwerte, Level-Karte, Welt-Freischaltungen (nur Welt 1 bleibt offen), Endgegner-Siege, Werkstatt-Sachen und -Auswahl, Salto-/Tor-/Herz-/Maschinen-Hinweise und alle Bestenlisten.
 Erhalten bleiben: die Musik-Einstellung und der zuletzt eingetippte Name. Danach schaltet keine alte Umstellung (Migration) wieder etwas frei.

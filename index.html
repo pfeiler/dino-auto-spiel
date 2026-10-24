@@ -341,6 +341,11 @@ const SFX={
   cage(){tone(700,0.07,'square',0.07);tone(520,0.09,'square',0.07,null,0.08);[659,880,1175].forEach((f,i)=>tone(f,0.16,'triangle',0.15,null,0.2+i*0.08));},
   heart(){[784,988,1175,1568].forEach((f,i)=>tone(f,0.18,'sine',0.2,null,i*0.07));tone(1568,0.3,'triangle',0.1,null,0.32);},
   heartLand(){tone(420,0.12,'sine',0.15,260);},
+  steam(){noise(1.6,900,'bandpass',0.3,0,3000);tone(90,0.6,'sawtooth',0.08,60);},
+  shatter(){noise(0.5,6000,'highpass',0.3);[1568,2093,1760,2349].forEach((f,i)=>tone(f,0.12,'triangle',0.1,null,i*0.05));},
+  bubble(){[330,440,550,660,880].forEach((f,i)=>tone(f,0.1,'sine',0.14,f*1.5,i*0.07));},
+  grow(){tone(200,0.6,'triangle',0.16,700);[523,659,784].forEach((f,i)=>tone(f,0.14,'sine',0.12,null,0.4+i*0.08));},
+  short(){noise(0.5,3000,'highpass',0.3,0,600);tone(120,0.4,'sawtooth',0.12,50);tone(1800,0.15,'square',0.07,400,0.1);},
   zap(){const n=performance.now();if(n-lastBump<250)return;lastBump=n;tone(1800,0.12,'sawtooth',0.08,300);noise(0.12,4000,'highpass',0.15);}
 };
 /* ---- music: one variation per world ---- */
@@ -435,10 +440,16 @@ const RAMP_LAND=900;
 const CH_GATES=[[0,0,1,1,0],[0,1,1,1,0],[0,1,1,2,0],[1,1,1,2,0],[1,1,2,2,0]];
 const CH_HEARTS=[[0,1,1,1,1],[1,1,0,1,1],[1,0,1,1,1],[1,1,0,1,1],[1,0,1,1,1]];
 const CH_WD={gate:1000,heart:1200};
-WORLDS.forEach((Wd,w)=>Wd.levels.forEach((l,i)=>{l.gates=CH_GATES[w][i];l.hearts=CH_HEARTS[w][i];}));
+/* Welt-Herz-Herausforderungen (Version 2.5): je Welt ersetzen 2 der 4 Herz-Käfige eine eigene Herz-Maschine (1 = dieses Levels Herz ist die Welt-Maschine).
+   Der erste Herz-Käfig jeder Welt bleibt ein klassischer Wasserrad-Käfig, Boss-Level behalten ihren Wasserrad-Käfig. */
+const SPECIAL_KIND=['geyser','ice','leaf','tube','circuit'];
+const CH_SPECIAL=[[0,0,1,1,0],[0,1,0,1,0],[0,0,1,1,0],[0,1,0,1,0],[0,0,1,1,0]];
+/* Platz im Planer je Herz-Art: Eisblock hängt über einer vorhandenen Rampe (Landezone ist schon frei) → braucht keinen eigenen Platz */
+const HEART_WD={heart:1200,geyser:1200,ice:0,leaf:1200,tube:1200,circuit:1200};
+WORLDS.forEach((Wd,w)=>Wd.levels.forEach((l,i)=>{l.gates=CH_GATES[w][i];l.hearts=CH_HEARTS[w][i];l.heartKind=CH_SPECIAL[w][i]?SPECIAL_KIND[w]:'heart';}));
 // new worlds: level length follows from its content (so every obstacle/ramp/zone/challenge fits with ~20 % slack)
 WORLDS.slice(1).forEach(Wd=>Wd.levels.forEach(l=>{const Z=l.zones||{};const need=l.ramps*(380+RAMP_LAND)+l.obst*520+(l.lasers||0)*600+(Z.mud||0)*570+(Z.river||0)*510;
-  l.len=Math.round((1200+l.fires.length*620+720+1.32*need+1.25*(l.gates*CH_WD.gate+l.hearts*CH_WD.heart)+(l.boss?2300:0))/100)*100;}));
+  l.len=Math.round((1200+l.fires.length*620+720+1.32*need+1.25*(l.gates*CH_WD.gate+l.hearts*HEART_WD[l.heartKind])+(l.boss?2300:0))/100)*100;}));
 const BOSS_T={
  dragon:{label:'🐉 Feuer-Drache',hp:320,base:1.7,vary:1.3,T:1.9,mouth:[-120,-205],proj:'fire',patch:'fire',hint:'🐉 Der Feuer-Drache! Lösche ihn mit WASSER 💧!',defeat:'Drache besiegt! 🐉',win:'Der Drache ist gelöscht!',done:'Du hast den Drachen gelöscht! Fahr ins Ziel! 🏁'},
  yeti:{label:'❄️ Eis-Yeti',hp:340,base:1.6,vary:1.2,T:1.85,mouth:[-115,-265],proj:'snow',patch:'snow',hint:'❄️ Der Eis-Yeti! Warmes WASSER 💧 lässt ihn schmelzen!',defeat:'Yeti geschmolzen! ❄️',win:'Der Eis-Yeti ist geschmolzen!',done:'Der Yeti ist geschmolzen! Fahr ins Ziel! 🏁'},
@@ -459,7 +470,7 @@ function w1Segs(L){const len=L.len,total=len+2500;const fx=[[0,800]];L.fires.for
   L.ramps0.concat(L.rampsX||[]).forEach(r=>{const x=Math.round(r.f*len);fx.push([x-100,x+r.len+RAMP_LAND]);});fx.push(L.boss?[len-2100,total]:[len-400,total]);
   fx.sort((a,b)=>a[0]-b[0]);const segs=[];let cur=0;for(const [a,b] of fx){if(a>cur)segs.push([cur,a]);cur=Math.max(cur,b);}return segs;}
 /* Welt 1: alles, was in die freien Stücke muss – Herz-Käfige, Gitter-Tore (groß, zuerst) und Hindernisse (je 520) */
-function w1ItemList(L){const a=[];for(let k=0;k<(L.hearts||0);k++)a.push({k:'heart',wd:CH_WD.heart});for(let k=0;k<(L.gates||0);k++)a.push({k:'gate',wd:CH_WD.gate});for(let k=0;k<L.obst;k++)a.push({k:'obst',wd:520});return a;}
+function w1ItemList(L){const a=[];for(let k=0;k<(L.hearts||0);k++)a.push({k:'heart',wd:HEART_WD[L.heartKind||'heart']});for(let k=0;k<(L.gates||0);k++)a.push({k:'gate',wd:CH_WD.gate});for(let k=0;k<L.obst;k++)a.push({k:'obst',wd:520});return a;}
 function w1PackOk(gaps,L){const load=gaps.map(()=>0);for(const it of w1ItemList(L)){let bi=-1,br=-1;gaps.forEach((R,j)=>{const room=R-load[j]-it.wd;if(room>=0&&room>br){br=room;bi=j;}});if(bi<0)return false;load[bi]+=it.wd;}return true;}
 function w1Fits(L){return w1PackOk(w1Segs(L).map(g=>g[1]-g[0]),L);}
 /* Welt 1: fehlende Rampen ergänzen (Soll L.ramps). Rampe + Landezone belegen [x-100, x+Länge+RAMP_LAND] in einem freien Stück (wie Hindernisse:
@@ -489,7 +500,7 @@ function w1ExtraRamps(L,i){L.rampsX=[];const n=L.ramps-L.ramps0.length;if(n<=0)r
 WORLDS[0].levels.forEach((L,i)=>{L.len0=L.len;L.ramps0=w1LegacyRamps(L,i);L.rampsX=[];while(!w1Fits(L))L.len+=100;L.len+=200;/* +200 m Luft, damit es nicht eng wird */
   const len1=L.len;while(!w1ExtraRamps(L,i))L.len+=100;
   if(L.len>len1){L.len+=200;while(!w1ExtraRamps(L,i))L.len+=100;}/* musste die Strecke wachsen: wieder +200 m Luft */});
-const WORLD_MAX=[46400,33800,35100,37100,37700]; // Version 2.4: mit Gitter-Toren & Herz-Käfigen (vorher 43100/30300/31000/33000/33000)
+const WORLD_MAX=[46900,33300,35600,37000,37700]; // Version 2.5: mit Welt-Herz-Maschinen (Geysir/Eis/Blatt/Reagenzglas/Stromkreis); 2.4: 46400/33800/35100/37100/37700; davor 43100/30300/31000/33000/33000
 const UNLOCK_PCT=0.9;
 const LS_BEST='dinoAutoSpiel.worldBest.v1', LS_MUSIC='dinoAutoSpiel.music';
 const BASE=430, G=1800, WG=700, WSPEED=950;
@@ -498,7 +509,7 @@ const BASE=430, G=1800, WG=700, WSPEED=950;
 let state='title', paused=false;
 let worldIdx=0, vehIdx=0, veh=VEHICLES[0], levelIdx=0, lvl=null, theme=THEMES.meadow;
 let car=null, score=0, hearts=3, crashes=0, levelTime=0, maxX=0, lastCp=0;
-let camX=0,camY=0, parts=[], water=[], pops=[], fireballs=[], boss=null;
+let camX=0,camY=0,camLift=0,CAM_LIFT=80, parts=[], water=[], pops=[], fireballs=[], boss=null;
 let zapT=0, flashT=0, sprayAcc=0, hintT=0, blockedT=0, levelStartScore=0, runId=0, distAcc=0;
 const input={gas:false,brake:false,jump:false,jumpPressed:false,water:false,aim:null};
 const stats={jumps:0,fires:0,obst:0,saltos:0,wobbles:0,gates:0,cages:0,hearts:0,heartsMissed:0};
@@ -512,18 +523,25 @@ let landLog=[];
 const MAX_HEARTS=3;
 const GATE_PTS=100, CAGE_PTS=150, HEART_PTS=250, HEART_MAX_PTS=250; // Tor auf, Käfig auf (doppelt so viel Spritzen wie ein Feuer), Herz gefangen: immer +250 – fehlt ein Leben, gibt es zusätzlich +1 Herz
 const HEART_G=1000, HEART_LINGER=4, HEART_FADE=1.2, HEART_CATCH_X=100; // Herz fällt sanft, bleibt 4 s liegen, verblasst dann; Fang-Bereich ±100 px
-const LS_GATEDONE='dinoAutoSpiel.gateDone.v1', LS_HEARTDONE='dinoAutoSpiel.heartDone.v1'; // Hinweis nur, bis das Kind es einmal geschafft hat
+const LS_GATEDONE='dinoAutoSpiel.gateDone.v1', LS_HEARTDONE='dinoAutoSpiel.heartDone.v1';
+const LS_CHDONE=k=>'dinoAutoSpiel.done.'+k+'.v1'; // Welt-Herz-Maschinen: erster Hinweis, bis das Kind die Maschine einmal ausgelöst hat // Hinweis nur, bis das Kind es einmal geschafft hat
 const GATE_COLS=['#ff9800','#ab47bc','#26c6da','#ef5350','#9ccc65'];
 /* need = Sekunden Dauerspritzen (normales Auto; Feuerwehr ≈ 1,9× schneller). back = wie weit hinter dem Auto noch automatisch gezielt wird. */
 const TRIG_T={
  wheel:{name:'Rädchen',hub:150,r:28,need:0.8,back:330},
- waterwheel:{name:"Wasserrad",hub:170,r:44,need:1.6,back:60}};
+ waterwheel:{name:"Wasserrad",hub:170,r:44,need:1.6,back:60},
+ /* Welt-Herz-Maschinen (Version 2.5). rearm = nach dem Dampf wieder füllbar; mult(ch,c) = wie stark ein Treffer zählt (0 = gar nicht); decay = Füllung sinkt ohne Wasser (pro s) */
+ vent:{name:'Lava-Loch',hub:10,r:42,need:0.5,back:140,rearm:true},
+ ice:{name:'Eisblock',hub:0,r:50,need:0.3,back:340,mult:(ch,c,p)=>(p.rj!=null&&Math.abs(p.rj-ch.rampEnd)<2)?(c.spin>1?1.6:1):0} /* zählt nur Wasser, das IM SPRUNG über genau diese Rampe gespritzt wurde */,
+ seed:{name:'Samen',hub:14,r:36,need:0.6,back:140},
+ tube:{name:'Reagenzglas',hub:140,r:48,need:1.6,back:180,mult:(ch,c)=>Math.abs(c.vx)<=260?1:0.2}, // langsam/stehend zählt voll, volle Fahrt kaum
+ contacts:{name:'Kupfer-Kontakte',hub:72,r:28,need:1.2,back:80,decay:0.6,mult:()=>58/(veh.rate*veh.dmg)}}; // Stromkreis: für jedes Fahrzeug ~1,2 s Strahl (unabhängig von der Spritzleistung)
 function mkTrig(type,x){return {type,x:Math.round(x),fill:0,need:TRIG_T[type].need,done:false,spin:0,hitT:0};}
-function trigPos(tr){return {x:tr.x,y:groundY(tr.x)-TRIG_T[tr.type].hub};}
+function trigPos(tr){return tr.y!=null?{x:tr.x,y:tr.y}:{x:tr.x,y:groundY(tr.x)-TRIG_T[tr.type].hub};}
 function trigHit(tr,p){const q=trigPos(tr);return Math.hypot(p.x-q.x,p.y-q.y)<TRIG_T[tr.type].r+30;}
 function trigFeed(ch,amt){const tr=ch.trig;if(tr.done)return;tr.fill=Math.min(tr.need,tr.fill+amt);tr.hitT=0.2;
   if(tr.fill>=tr.need-1e-9){tr.done=true;tr.fill=tr.need;CHAL_T[ch.kind].open(ch);}}
-function trigTick(tr,dt){tr.hitT=Math.max(0,tr.hitT-dt);tr.spin+=dt*(tr.hitT>0?9:tr.done?2.5:0.4);}
+function trigTick(tr,dt){const T=TRIG_T[tr.type];if(T.decay&&!tr.done&&tr.hitT<=0)tr.fill=Math.max(0,tr.fill-T.decay*dt);tr.hitT=Math.max(0,tr.hitT-dt);tr.spin+=dt*(tr.hitT>0?9:tr.done?2.5:0.4);}
 function heartPath(x,y,s){ctx.beginPath();ctx.moveTo(x,y+s*0.95);ctx.bezierCurveTo(x-s*1.7,y-s*0.05,x-s*0.8,y-s*1.35,x,y-s*0.45);ctx.bezierCurveTo(x+s*0.8,y-s*1.35,x+s*1.7,y-s*0.05,x,y+s*0.95);ctx.closePath();}
 function drawHeart(x,y,s,a=1){ctx.globalAlpha=a;heartPath(x,y,s);ctx.fillStyle='#e53935';ctx.fill();ctx.lineWidth=3;ctx.strokeStyle='#fff';ctx.stroke();
   ctx.fillStyle='rgba(255,255,255,.55)';ctx.beginPath();ctx.ellipse(x-s*0.5,y-s*0.45,s*0.22,s*0.14,-0.6,0,7);ctx.fill();ctx.globalAlpha=1;}
@@ -551,6 +569,19 @@ function drawWaterwheel(tr){const q=trigPos(tr),r=TRIG_T.waterwheel.r;drawPost(t
 function chainLine(x0,y0,x1,y1,col,off){const L=Math.hypot(x1-x0,y1-y0),n=Math.floor(L/16),a=Math.atan2(y1-y0,x1-x0);ctx.strokeStyle=col;ctx.lineWidth=3.5;
   for(let k=0;k<n;k++){const t=(k+(off%1+1)%1)/n;const x=lerp(x0,x1,t),y=lerp(y0,y1,t)+Math.sin(t*Math.PI)*22;ctx.save();ctx.translate(x,y);ctx.rotate(a+(k%2?Math.PI/2:0)*0.0);
     ctx.beginPath();ctx.ellipse(0,0,8,k%2?3:5,0,0,7);ctx.stroke();ctx.restore();}}
+/* Maße der Welt-Herz-Maschinen (px; Auto-Sprung normal ≈150 px hoch, Rampen-Sprung ≈380 px über der Rampe) */
+const GEYSER_HX=90, GEYSER_HY=380, GEYSER_V=1100, GEYSER_T=4.5, GEYSER_W=80;   // Herz 90 px hinter dem Loch, 380 px hoch; Dampf hebt mit 1100 px/s (≈340 px hoch), 4,5 s lang
+const ICE_DX=250, ICE_H=470;                                                  // Eisblock 250 px hinter der Rampe, 470 px über der Rampen-Kante (über dem Auto am höchsten Punkt)
+const LEAF_HX=170, LEAF_HY=380, LEAF_V=1100, LEAF_W=60;                       // Herz 170 px hinter dem Blatt, 380 px hoch; Blatt ±60 px
+const HANG_CATCH_UP=190; // hängendes Herz: fangen, wenn es höchstens 190 px über den Rädern ist (normaler Sprung ≈150 px reicht dafür nicht: 150+190 < 380)
+const TUBE_TOP=250, MAG_Y=330;
+function chHint(ch,c,x,txt){if(!ch.hinted&&x-c.x<W*0.75){ch.hinted=true;if(!lsGet(LS_CHDONE(ch.kind),0))showHint(txt,4);}}
+function chOpenPts(ch,x,y,label,col){if(ch.open)return false;ch.open=true;stats.cages++;lsSet(LS_CHDONE(ch.kind),1);addScore(CAGE_PTS,x,y,label,col);return true;}
+function hexRgb(h){const n=parseInt(h.slice(1),16);return [n>>16,(n>>8)&255,n&255];}
+function tubeCol(f){const A=hexRgb('#8e24aa'),B=hexRgb('#1e88e5'),C=hexRgb('#43a047');const [p,q,u]=f<0.5?[A,B,f*2]:[B,C,(f-0.5)*2];return 'rgb('+p.map((v,k)=>Math.round(lerp(v,q[k],clamp(u,0,1)))).join(',')+')';}
+function drawDrop(x,dy){dy+=Math.sin(performance.now()/180)*5;ctx.fillStyle='#4fc3f7';ctx.strokeStyle='#fff';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(x,dy-15);
+  ctx.quadraticCurveTo(x+11,dy,x+9,dy+5);ctx.arc(x,dy+5,9,0,Math.PI);ctx.quadraticCurveTo(x-11,dy,x,dy-15);ctx.fill();ctx.stroke();}
+function initChallenges(){for(const ch of lvl.challenges){const T=CHAL_T[ch.kind];if(T.init)T.init(ch);}}
 const CHAL_T={
  /* Gitter-Tor: blockiert sanft (kein Unfall, kein Herz weg), bis das Rädchen 300 px davor nass genug ist; dann fährt es hoch und bleibt offen */
  gate:{wd:CH_WD.gate,par:3,
@@ -585,11 +616,7 @@ const CHAL_T={
   open(ch){ch.open=true;stats.cages++;SFX.cage();const gy=groundY(ch.x);addScore(CAGE_PTS,ch.x,gy-330,'Käfig offen! 🔓','#f48fb1');ch.heart={x:ch.x,y:gy-255,vy:-80,st:'fall',t:0};},
   update(ch,c,dt){const tr=ch.trig;trigTick(tr,dt);if(ch.open)ch.door=Math.min(1,ch.door+dt*3);
     if(!ch.hinted&&tr.x-c.x<W*0.75){ch.hinted=true;if(!lsGet(LS_HEARTDONE,0))showHint('❤️ Herz im Käfig! Spritz lange aufs Wasserrad – langsam fahren hilft!',3.5);}
-    const h=ch.heart;if(!h||h.st==='caught'||h.st==='gone')return;h.t+=dt;
-    if(h.st==='fall'){h.vy+=HEART_G*dt;h.y+=h.vy*dt;const gy=groundY(h.x)-26;if(h.y>=gy){h.y=gy;h.vy=0;h.st='ground';h.t=0;SFX.heartLand();
-      for(let k=0;k<8;k++)parts.push({k:'dust',x:h.x+rnd(-20,20),y:gy+24,vx:rnd(-80,80),vy:rnd(-80,-20),life:0.5,t:0,s:rnd(5,9)});}}
-    else if(h.t>HEART_LINGER+HEART_FADE){h.st='gone';stats.heartsMissed++;return;}
-    if(c.crashT<=0&&Math.abs(h.x-c.x)<HEART_CATCH_X&&h.y>c.y-215&&h.y<c.y+40)catchHeart(ch);},
+    heartTick(ch,c,dt);},
   draw(ch){const gy=groundY(ch.x),x=ch.x,cy=gy-255;drawWaterwheel(ch.trig);
     // Galgen: Pfosten hinter dem Käfig, Arm, Seil
     drawPost(x+90,gy-345);ctx.fillStyle='#6d4c41';ctx.fillRect(x-6,gy-351,102,12);ctx.strokeStyle='#8d6e63';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x,gy-339);ctx.lineTo(x,cy-34);ctx.stroke();
@@ -600,11 +627,168 @@ const CHAL_T={
     for(let k=-2;k<=2;k++){ctx.beginPath();ctx.moveTo(x+k*13,cy-30);ctx.lineTo(x+k*13,cy+30);ctx.stroke();}
     // Boden-Klappe: schwingt beim Öffnen nach unten
     ctx.save();ctx.translate(x-34,cy+30);ctx.rotate(ch.door*1.4);ctx.fillStyle='#ffb300';ctx.fillRect(0,-4,68,8);ctx.restore();},
-  drawFront(ch){const h=ch.heart;if(!h||h.st==='caught'||h.st==='gone')return;let a=1,s=22;
-    if(h.st==='ground'){s=22+Math.sin(h.t*7)*2.5;if(h.t>HEART_LINGER)a=clamp(1-(h.t-HEART_LINGER)/HEART_FADE,0,1);else if(h.t>HEART_LINGER-1.5)a=0.55+0.45*Math.abs(Math.cos(h.t*9));
-      ctx.fillStyle=`rgba(0,0,0,${0.18*a})`;ctx.beginPath();ctx.ellipse(h.x,h.y+26,22,6,0,0,7);ctx.fill();}
-    drawHeart(h.x,h.y,s,a);}}};
-function catchHeart(ch){const h=ch.heart;h.st='caught';stats.hearts++;SFX.heart();lsSet(LS_HEARTDONE,1);
+  drawFront(ch){drawHeartObj(ch.heart);}},
+ /* ===== Welt-Herz-Maschinen (Version 2.5) – alle: Auslöser nass → +150, Herz fangen → +250; Herz schwebt sanft zum Auto ===== */
+ /* 🌋 Dampf-Geysir (Welt 1): Wasser ins glühende Lava-Loch → 4,5 s Dampf-Säule; wer hineinfährt/-springt, wird hoch zum Herz gehoben.
+    Das Herz hängt 470 px hoch (ein normaler Sprung schafft nur ~150 px). Nach dem Dampf kann man das Loch wieder füllen. */
+ geyser:{wd:HEART_WD.geyser,par:5,
+  make(st){const v=Math.round(st+560);return {kind:'geyser',st:Math.round(st),x:v+GEYSER_HX,vent:v,open:false,steamT:0,lifts:0,hinted:false,trig:mkTrig('vent',v),heart:null};},
+  flat(ch,flatten){flatten(ch.vent-330,ch.vent+520,140);},
+  init(ch){ch.heart=softHeart(ch.x,groundY(ch.x)-GEYSER_HY,ch.st+60,ch.st+1140,'hang');},
+  open(ch){ch.steamT=GEYSER_T;SFX.steam();chOpenPts(ch,ch.vent,groundY(ch.vent)-200,'Dampf! 💨','#ffcc80');
+    if(hintT>0&&$('hint').textContent.includes('Geysir'))showHint('💨 Dampf! Schnell hineinfahren!',1.8);},
+  update(ch,c,dt){const tr=ch.trig,gy=groundY(ch.vent);trigTick(tr,dt);
+    chHint(ch,c,tr.x,'🌋 Dampf-Geysir! Spritz Wasser ins glühende Loch – dann fahr in den Dampf! 💨❤️');
+    if(ch.steamT>0){ch.steamT-=dt;
+      if(Math.random()<dt*40)parts.push({k:'steam',x:ch.vent+rnd(-30,30),y:gy-rnd(0,40),vx:rnd(-30,30),vy:-rnd(380,560),life:rnd(0.8,1.2),t:0,s:rnd(16,30)});
+      if(c.crashT<=0&&Math.abs(c.x-ch.vent)<GEYSER_W&&c.y>gy-140&&c.vy>-700){c.vy=-GEYSER_V;c.onGround=false;c.air=0;c.rampJump=false;c.vx=clamp(c.vx,140,450);ch.lifts++;SFX.whoosh();}
+      if(ch.steamT<=0&&ch.heart&&ch.heart.st==='hang'){tr.done=false;tr.fill=0;}} // Herz noch oben: Loch ist wieder füllbar
+    heartTick(ch,c,dt);},
+  draw(ch){const v=ch.vent,gy=groundY(v),t=performance.now()/1000,tr=ch.trig,hx=ch.x,hy=groundY(hx)-GEYSER_HY,px=hx+150,pg=groundY(px);
+    // Basalt-Säule mit Arm; Herz hängt am Seil hoch über dem Loch
+    ctx.fillStyle='#4e342e';ctx.beginPath();ctx.moveTo(px-30,pg+6);ctx.lineTo(px-18,hy-92);ctx.lineTo(px+20,hy-100);ctx.lineTo(px+32,pg+6);ctx.closePath();ctx.fill();
+    ctx.fillStyle='rgba(255,112,67,.55)';for(let k=0;k<5;k++)ctx.fillRect(px-8+(k%2)*10,hy-50+k*90,5,44);
+    ctx.fillStyle='#3e2723';ctx.fillRect(hx-8,hy-104,px-hx+26,16);
+    if(ch.heart&&ch.heart.st==='hang'){ctx.strokeStyle='#d7ccc8';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(hx,hy-88);ctx.lineTo(hx,hy-28);ctx.stroke();}
+    // Dampf-Säule
+    if(ch.steamT>0){const a=clamp(ch.steamT,0,1)*clamp((GEYSER_T-ch.steamT)*4,0,1);
+      for(let k=0;k<9;k++){const yy=gy-20-k*62,w=34+k*7+Math.sin(t*6+k)*6;ctx.fillStyle=`rgba(255,255,255,${0.6*a*(1-k/12)})`;ctx.beginPath();ctx.ellipse(v+Math.sin(t*3+k*0.7)*8,yy,w,36,0,0,7);ctx.fill();}}
+    // Lava-Loch: Hügel mit glühender Öffnung
+    const glow=0.6+0.4*Math.sin(t*4);
+    ctx.fillStyle='#5d4037';ctx.beginPath();ctx.ellipse(v,gy+6,74,30,0,Math.PI,0);ctx.fill();
+    ctx.fillStyle=`rgb(255,${120+60*glow|0},0)`;ctx.beginPath();ctx.ellipse(v,gy-17,36,10,0,0,7);ctx.fill();
+    ctx.fillStyle=`rgba(255,235,59,${0.6*glow})`;ctx.beginPath();ctx.ellipse(v,gy-17,18,5,0,0,7);ctx.fill();
+    if(!tr.done&&Math.random()<0.15)parts.push({k:'smoke',x:v+rnd(-14,14),y:gy-20,vx:rnd(-8,8),vy:-rnd(30,60),life:1.2,t:0,s:rnd(6,11)});
+    drawFillRing(trigPos(tr),TRIG_T.vent.r-10,tr);},
+  drawFront(ch){drawHeartObj(ch.heart);}},
+ /* 🧊 Eisblock (Welt 2): hängt an Ballons über der Flugbahn einer Rampe. Schmilzt NUR durch Wasser-Treffer, während das Auto über genau diese Rampe fliegt
+    (Salto + Spritzen zählt 1,6-fach). Dann zerspringt er, das Herz schwebt in die (immer freie) Landezone. */
+ ice:{wd:0,par:1,
+  make(r){const end=Math.round(r.x+r.len),x=end+ICE_DX;return {kind:'ice',st:r.x,x,rampX:r.x,rampEnd:end,open:false,hinted:false,dry:0,dryT:0,trig:mkTrig('ice',x),heart:null};},
+  flat(){},
+  init(ch){ch.trig.y=Math.round(groundY(ch.rampEnd-4)-ICE_H);},
+  open(ch){const q=trigPos(ch.trig);SFX.shatter();chOpenPts(ch,q.x,q.y-70,'Eis geschmolzen! 🧊','#b3e5fc');
+    for(let k=0;k<24;k++)parts.push({k:'dot',col:k%2?'#e1f5fe':'#81d4fa',x:q.x+rnd(-35,35),y:q.y+rnd(-35,35),vx:rnd(-260,260),vy:rnd(-300,80),life:0.9,t:0,s:rnd(4,9)});
+    ch.heart=softHeart(q.x,q.y,ch.rampEnd+60,ch.rampEnd+RAMP_LAND-80,'fall',-40);},
+  refuse(ch){ch.dry++;if(ch.dryT<=0&&(hintT<=0||!$('hint').textContent.includes('Eis'))){ch.dryT=3;showHint('🧊 Das Eis schmilzt nur im SPRUNG über die Rampe! ⤒💧',2.2);}},
+  update(ch,c,dt){const tr=ch.trig;trigTick(tr,dt);ch.dryT=Math.max(0,ch.dryT-dt);
+    chHint(ch,c,ch.rampX,'🧊 Herz im Eisblock! Spring über die Rampe und spritz IN DER LUFT aufs Eis! 💧');
+    heartTick(ch,c,dt);},
+  draw(ch){if(ch.open)return;const tr=ch.trig,q=trigPos(tr),t=performance.now()/1000,y=q.y+Math.sin(t*2)*5,f=tr.fill/tr.need,s=44*(1-0.25*f);
+    [[-34,'#ff7043',0],[32,'#ab47bc',1]].forEach(([dx,col,k])=>{const bx=q.x+dx,by=y-150-k*16;ctx.strokeStyle='#eceff1';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(q.x+dx*0.3,y-s);ctx.quadraticCurveTo(bx-6,by+60,bx,by+34);ctx.stroke();
+      ctx.fillStyle=col;ctx.beginPath();ctx.ellipse(bx,by,26,32,0,0,7);ctx.fill();ctx.fillStyle='rgba(255,255,255,.4)';ctx.beginPath();ctx.ellipse(bx-9,by-10,6,10,-0.4,0,7);ctx.fill();});
+    drawHeart(q.x,y+2,18);
+    ctx.fillStyle='rgba(179,229,252,.62)';rr(q.x-s,y-s,2*s,2*s,10);ctx.fill();ctx.strokeStyle='#e1f5fe';ctx.lineWidth=3;ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.55)';ctx.fillRect(q.x-s+8,y-s+8,9,2*s-30);
+    if(f>0){ctx.strokeStyle='rgba(1,87,155,.75)';ctx.lineWidth=2;for(let k=0;k<Math.ceil(f*7);k++){const a=k*1.7;ctx.beginPath();ctx.moveTo(q.x,y);ctx.lineTo(q.x+Math.cos(a)*s*0.95,y+Math.sin(a)*s*0.95);ctx.stroke();}}
+    if(tr.hitT>0&&Math.random()<0.5)parts.push({k:'drop',x:q.x+rnd(-s,s),y:y+s,vx:rnd(-30,30),vy:rnd(20,80),life:0.5,t:0,s:3});
+    drawFillRing({x:q.x,y},s+6,tr);},
+  drawFront(ch){drawHeartObj(ch.heart);}},
+ /* 🌱 Blatt-Katapult (Welt 3): Samen gießen → großes federndes Blatt wächst; drauffahren → Katapult hoch durch das Herz an der Liane */
+ leaf:{wd:HEART_WD.leaf,par:5,
+  make(st){const s0=Math.round(st+500);return {kind:'leaf',st:Math.round(st),x:s0+LEAF_HX,seed:s0,open:false,grow:0,bounce:0,launches:0,hinted:false,trig:mkTrig('seed',s0),heart:null};},
+  flat(ch,flatten){flatten(ch.seed-320,ch.seed+520,140);},
+  init(ch){ch.heart=softHeart(ch.x,groundY(ch.x)-LEAF_HY,ch.st+60,ch.st+1140,'hang');},
+  open(ch){SFX.grow();chOpenPts(ch,ch.seed,groundY(ch.seed)-180,'Blatt wächst! 🌱','#b9f6ca');
+    if(hintT>0&&$('hint').textContent.includes('Samen'))showHint('🍃 Jetzt aufs Blatt fahren!',1.8);},
+  update(ch,c,dt){const tr=ch.trig;trigTick(tr,dt);if(ch.open)ch.grow=Math.min(1,ch.grow+dt/0.7);ch.bounce=Math.max(0,ch.bounce-dt*2.5);
+    chHint(ch,c,tr.x,'🌱 Ein Samen! Gieß ihn mit Wasser – dann fahr aufs große Blatt! 🍃❤️');
+    if(ch.grow>0.8&&c.onGround&&c.crashT<=0&&Math.abs(c.x-ch.seed)<LEAF_W&&c.vy>-600){c.vy=-LEAF_V;c.onGround=false;c.air=0;c.rampJump=false;c.vx=clamp(c.vx,200,380);ch.bounce=1;ch.launches++;SFX.boing();
+      for(let k=0;k<10;k++)parts.push({k:'dot',col:'#66bb6a',x:ch.seed+rnd(-50,50),y:groundY(ch.seed)-30,vx:rnd(-120,120),vy:rnd(-260,-80),life:0.7,t:0,s:rnd(4,7)});}
+    heartTick(ch,c,dt);},
+  draw(ch){const s0=ch.seed,gy=groundY(s0),t=performance.now()/1000,tr=ch.trig,hx=ch.x,hy=groundY(hx)-LEAF_HY;
+    if(ch.heart&&ch.heart.st==='hang'){ctx.strokeStyle='#33691e';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(hx-70,hy-460);ctx.quadraticCurveTo(hx+40,hy-220,hx,hy-26);ctx.stroke();
+      ctx.fillStyle='#558b2f';for(let k=1;k<6;k++){const yy=hy-20-k*72,xx=hx+Math.sin(k*1.3)*16-k*6;ctx.beginPath();ctx.ellipse(xx+10,yy,14,6,0.5,0,7);ctx.fill();}}
+    ctx.fillStyle='#6d4c41';ctx.beginPath();ctx.ellipse(s0,gy+6,64,22,0,Math.PI,0);ctx.fill();
+    if(ch.grow<=0){ctx.fillStyle='#bcaaa4';ctx.beginPath();ctx.ellipse(s0,gy-14,14,10,0.3,0,7);ctx.fill();ctx.strokeStyle='#4e342e';ctx.lineWidth=2;ctx.stroke();
+      const sp=tr.fill/tr.need;if(sp>0){ctx.strokeStyle='#7cb342';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(s0,gy-20);ctx.lineTo(s0+4,gy-20-sp*30);ctx.stroke();}}
+    else{const g=ch.grow,sq=1-0.4*Math.sin(ch.bounce*Math.PI),lh=(10+g*24)*sq,lw=LEAF_W*g+18;
+      ctx.strokeStyle='#558b2f';ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(s0,gy-4);ctx.lineTo(s0,gy-lh);ctx.stroke();
+      ctx.fillStyle='#43a047';ctx.beginPath();ctx.ellipse(s0,gy-lh-4,lw,12*g+5,0,0,7);ctx.fill();ctx.strokeStyle='#1b5e20';ctx.lineWidth=3;ctx.stroke();
+      ctx.beginPath();ctx.moveTo(s0-lw+6,gy-lh-4);ctx.lineTo(s0+lw-6,gy-lh-4);ctx.stroke();
+      if(g>0.8){ctx.fillStyle='rgba(255,235,59,.9)';const a=Math.abs(Math.sin(t*4))*10;for(const dx of [-26,0,26]){ctx.beginPath();ctx.moveTo(s0+dx-8,gy-lh-26-a);ctx.lineTo(s0+dx,gy-lh-40-a);ctx.lineTo(s0+dx+8,gy-lh-26-a);ctx.fill();}}}
+    drawFillRing(trigPos(tr),TRIG_T.seed.r-10,tr);},
+  drawFront(ch){drawHeartObj(ch.heart);}},
+ /* 🧪 Reagenzglas (Welt 4): lange spritzen (wie Wasserrad) → Flüssigkeit steigt, Farbe lila → blau → grün; dann schwebt das Herz heraus und rollt zum Auto */
+ tube:{wd:HEART_WD.tube,par:4,
+  make(st){const t0=Math.round(st+480);return {kind:'tube',st:Math.round(st),x:t0+200,tx:t0,open:false,hinted:false,trig:mkTrig('tube',t0),heart:null};},
+  flat(ch,flatten){flatten(ch.tx-330,ch.tx+420,140);},
+  open(ch){SFX.bubble();const gy=groundY(ch.tx);chOpenPts(ch,ch.tx,gy-TUBE_TOP-70,'Grün! 🧪','#b9f6ca');ch.heart=softHeart(ch.tx,gy-TUBE_TOP-10,ch.st+40,ch.st+1160,'fall',-120);ch.heart.g=1400;ch.heart.vmax=650; // hüpft über den Rand und rollt zum Auto
+    for(let k=0;k<16;k++)parts.push({k:'dot',col:'#69f0ae',x:ch.tx+rnd(-20,20),y:gy-TUBE_TOP,vx:rnd(-120,120),vy:rnd(-260,-60),life:0.8,t:0,s:rnd(4,8)});},
+  update(ch,c,dt){const tr=ch.trig;trigTick(tr,dt);chHint(ch,c,tr.x,'🧪 Reagenzglas! Langsam fahren und lange Wasser hineinspritzen – lila, blau, GRÜN! 💧❤️');
+    heartTick(ch,c,dt);},
+  draw(ch){const x=ch.tx,gy=groundY(x),tr=ch.trig,top=gy-TUBE_TOP,bot=gy-46,f=ch.open?1:tr.fill/tr.need,t=performance.now()/1000;
+    ctx.fillStyle='#78909c';rr(x-62,gy-14,150,16,5);ctx.fill();ctx.fillRect(x+70,top-40,10,gy-top+30);ctx.fillRect(x+24,top+40,56,9);ctx.fillRect(x+24,top+160,56,9);
+    const lv=bot-(bot-top-24)*Math.max(0.1,f);
+    ctx.save();ctx.beginPath();ctx.moveTo(x-30,top);ctx.lineTo(x-30,bot);ctx.arc(x,bot,30,Math.PI,0,true);ctx.lineTo(x+30,top);ctx.closePath();ctx.clip();
+    ctx.fillStyle=tubeCol(f);ctx.fillRect(x-32,lv,64,gy-lv);
+    ctx.fillStyle='rgba(255,255,255,.45)';const H0=Math.max(12,bot+26-lv);for(let k=0;k<5;k++){ctx.beginPath();ctx.arc(x-16+k*8,bot+26-((t*(50+k*12)+k*37)%H0),2.5+k%2,0,7);ctx.fill();}
+    ctx.restore();
+    if(!ch.open)drawHeart(x,lv-16+Math.sin(t*3)*3,16);
+    ctx.strokeStyle='rgba(255,255,255,.95)';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(x-30,top);ctx.lineTo(x-30,bot);ctx.arc(x,bot,30,Math.PI,0,true);ctx.lineTo(x+30,top);ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.22)';ctx.fillRect(x-22,top+10,8,bot-top-10);ctx.strokeStyle='#eceff1';ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(x-38,top);ctx.lineTo(x+38,top);ctx.stroke();
+    ['#8e24aa','#1e88e5','#43a047'].forEach((c2,k)=>{const yy=bot-10-k*(bot-top-40)/2;ctx.fillStyle=c2;ctx.beginPath();ctx.arc(x-56,yy,9,0,7);ctx.fill();ctx.strokeStyle=f>=k/2-0.01?'#fff':'rgba(255,255,255,.4)';ctx.lineWidth=2.5;ctx.stroke();});
+    if(tr.hitT>0&&Math.random()<0.4)parts.push({k:'dot',col:'rgba(255,255,255,.85)',x:x+rnd(-14,14),y:lv,vx:rnd(-10,10),vy:-rnd(40,90),life:0.5,t:0,s:rnd(3,5)});
+    if(!tr.done)drawDrop(x,top-40);},
+  drawFront(ch){drawHeartObj(ch.heart);}},
+ /* ⚡ Stromkreis (Welt 5): Wasserstrahl verbindet zwei Kupfer-Kugeln ~1–1,5 s (ohne Wasser sinkt die Ladung wieder) → Funken, Kurzschluss,
+    der Magnet lässt den Herz-Käfig los, das Herz schwebt sanft zum Auto */
+ circuit:{wd:HEART_WD.circuit,par:4,
+  make(st){const cx=Math.round(st+460);return {kind:'circuit',st:Math.round(st),x:cx+220,cx,open:false,hinted:false,sparkT:0,trig:mkTrig('contacts',cx),heart:null};},
+  flat(ch,flatten){flatten(ch.cx-330,ch.x+300,140);},
+  open(ch){SFX.short();const gy=groundY(ch.x);chOpenPts(ch,ch.cx,groundY(ch.cx)-200,'Kurzschluss! ⚡','#fff59d');ch.sparkT=1.2;
+    for(let k=0;k<26;k++)parts.push({k:'spark',x:ch.cx+rnd(-30,30),y:groundY(ch.cx)-TRIG_T.contacts.hub+rnd(-20,20),vx:rnd(-300,300),vy:rnd(-350,100),life:0.6,t:0,s:rnd(6,13)});
+    for(let k=0;k<12;k++)parts.push({k:'spark',x:ch.x+rnd(-30,30),y:gy-MAG_Y+rnd(-20,20),vx:rnd(-200,200),vy:rnd(-200,100),life:0.5,t:0,s:rnd(5,10)});
+    ch.heart=softHeart(ch.x,gy-255,ch.st+40,ch.st+1160,'fall',0);ch.heart.cage=true;},
+  update(ch,c,dt){const tr=ch.trig;trigTick(tr,dt);ch.sparkT=Math.max(0,ch.sparkT-dt);
+    chHint(ch,c,tr.x,'⚡ Stromkreis! Spritz Wasser zwischen die zwei Kupfer-Kugeln – gut draufhalten! 💧❤️');
+    if(tr.hitT>0&&!tr.done&&Math.random()<dt*20)parts.push({k:'spark',x:ch.cx+rnd(-20,20),y:groundY(ch.cx)-TRIG_T.contacts.hub+rnd(-8,8),vx:rnd(-160,160),vy:rnd(-200,60),life:0.3,t:0,s:rnd(4,9)});
+    heartTick(ch,c,dt);},
+  draw(ch){const cx=ch.cx,gc=groundY(cx),tr=ch.trig,hy=gc-TRIG_T.contacts.hub,x=ch.x,gy=groundY(x),my=gy-MAG_Y,f=ch.open?1:tr.fill/tr.need,t=performance.now()/1000;
+    // Kabel Kontakte → Magnet
+    ctx.strokeStyle=ch.open?'#455a64':'#263238';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(cx+34,gc-10);ctx.quadraticCurveTo((cx+x)/2,gc+10,x+100,gy-20);ctx.stroke();
+    ctx.strokeStyle='#e53935';ctx.beginPath();ctx.moveTo(cx-34,gc-10);ctx.quadraticCurveTo((cx+x)/2,gc+22,x+92,gy-20);ctx.stroke();
+    // Kupfer-Kontakte
+    for(const d of [-1,1]){const px=cx+d*34;ctx.fillStyle='#90a4ae';ctx.fillRect(px-5,hy,10,gc-hy);ctx.fillStyle='#d84315';ctx.beginPath();ctx.arc(px,hy,13,0,7);ctx.fill();
+      ctx.fillStyle='#ffab91';ctx.beginPath();ctx.arc(px-4,hy-4,4,0,7);ctx.fill();}
+    if(tr.hitT>0||ch.sparkT>0){ctx.strokeStyle=`rgba(255,241,118,${0.5+0.5*Math.random()})`;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(cx-22,hy);
+      for(let k=1;k<6;k++)ctx.lineTo(cx-22+k*44/6,hy+rnd(-10,10)*(0.4+f));ctx.lineTo(cx+22,hy);ctx.stroke();}
+    // Kran mit Elektro-Magnet
+    drawPost(x+100,my-60,'#546e7a');ctx.fillStyle='#546e7a';ctx.fillRect(x-10,my-66,124,12);
+    ctx.strokeStyle='#37474f';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x,my-54);ctx.lineTo(x,my-26);ctx.stroke();
+    ctx.fillStyle='#b71c1c';rr(x-30,my-26,60,30,6);ctx.fill();ctx.fillStyle=ch.open?'#616161':'#cfd8dc';ctx.fillRect(x-30,my+2,60,8);
+    if(!ch.open){ctx.strokeStyle=`rgba(129,212,250,${0.4+0.3*Math.sin(t*8)})`;ctx.lineWidth=2;for(let k=0;k<3;k++){ctx.beginPath();ctx.arc(x,my+16,10+k*8,0.2,Math.PI-0.2);ctx.stroke();}
+      const cy=gy-255;ctx.strokeStyle='#90a4ae';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x,my+10);ctx.lineTo(x,cy-30);ctx.stroke();
+      drawHeart(x,cy,20*(1+Math.sin(t*4.5)*0.06));ctx.strokeStyle='#90a4ae';rr(x-30,cy-30,60,58,8);ctx.stroke();for(let k=-1;k<=1;k++){ctx.beginPath();ctx.moveTo(x+k*15,cy-30);ctx.lineTo(x+k*15,cy+28);ctx.stroke();}}
+    ctx.fillStyle='#ffeb3b';ctx.font='bold 26px system-ui';ctx.textAlign='center';ctx.fillText('⚡',x+100,my-74);
+    drawFillRing(trigPos(tr),12,tr);},
+  drawFront(ch){drawHeartObj(ch.heart);}},};
+/* Herz-Bewegung für alle Herz-Herausforderungen. Klassisch (Käfig): fällt, bleibt liegen. Sanft (soft, Welt-Maschinen): fällt höchstens 200 px/s,
+   schwebt dabei zum Auto, rollt am Boden zum Auto – immer nur im eigenen freien Bereich [xmin, xmax] (nie in Feuer, Gruben oder Hindernisse). */
+const HEART_SOFT={vmax:200,g:520,drift:400,roll:150,catchX:125,linger:6};
+function softHeart(x,y,xmin,xmax,st='fall',vy=0){return {x,y,vx:0,vy,st,t:0,soft:true,xmin,xmax,roll:0};}
+function heartTick(ch,c,dt){const h=ch.heart;if(!h||h.st==='caught'||h.st==='gone')return;h.t+=dt;
+  if(h.soft){const dx=c.x-h.x;
+    if(h.st==='rise'){h.y-=80*dt;if(h.t>0.7){h.st='fall';h.t=0;h.vy=0;}}
+    else if(h.st==='fall'){h.vy=Math.min(h.vmax||HEART_SOFT.vmax,h.vy+(h.g||HEART_SOFT.g)*dt);h.y+=h.vy*dt;
+      h.vx=lerp(h.vx,clamp(dx*1.6,-HEART_SOFT.drift,HEART_SOFT.drift),clamp(dt*4,0,1));h.x=clamp(h.x+h.vx*dt,h.xmin,h.xmax);
+      const gy=groundY(h.x)-26;if(h.y>=gy){h.y=gy;h.vy=0;h.st='ground';h.t=0;h.cage=false;SFX.heartLand();
+        for(let k=0;k<8;k++)parts.push({k:'dust',x:h.x+rnd(-20,20),y:gy+24,vx:rnd(-80,80),vy:rnd(-80,-20),life:0.5,t:0,s:rnd(5,9)});}}
+    else if(h.st==='ground'){const v=clamp(dx*1.2,-HEART_SOFT.roll,HEART_SOFT.roll);h.x=clamp(h.x+v*dt,h.xmin,h.xmax);h.y=groundY(h.x)-26;h.roll+=v*dt/22;
+      if(h.t>HEART_SOFT.linger+HEART_FADE){h.st='gone';stats.heartsMissed++;return;}}
+    if(c.crashT<=0&&Math.abs(h.x-c.x)<HEART_SOFT.catchX&&h.y>c.y-(h.st==='hang'?HANG_CATCH_UP:225)&&h.y<c.y+45)catchHeart(ch);return;}
+  if(h.st==='fall'){h.vy+=HEART_G*dt;h.y+=h.vy*dt;const gy=groundY(h.x)-26;if(h.y>=gy){h.y=gy;h.vy=0;h.st='ground';h.t=0;SFX.heartLand();
+      for(let k=0;k<8;k++)parts.push({k:'dust',x:h.x+rnd(-20,20),y:gy+24,vx:rnd(-80,80),vy:rnd(-80,-20),life:0.5,t:0,s:rnd(5,9)});}}
+    else if(h.t>HEART_LINGER+HEART_FADE){h.st='gone';stats.heartsMissed++;return;}
+  if(c.crashT<=0&&Math.abs(h.x-c.x)<HEART_CATCH_X&&h.y>c.y-215&&h.y<c.y+40)catchHeart(ch);}
+function drawHeartObj(h){if(!h||h.st==='caught'||h.st==='gone')return;let a=1,s=22;const lg=h.soft?HEART_SOFT.linger:HEART_LINGER;
+  if(h.st==='hang')s=22+Math.sin(performance.now()/200)*2;
+  if(h.st==='ground'){s=22+Math.sin(h.t*7)*2.5;if(h.t>lg)a=clamp(1-(h.t-lg)/HEART_FADE,0,1);else if(h.t>lg-1.5)a=0.55+0.45*Math.abs(Math.cos(h.t*9));
+    ctx.fillStyle=`rgba(0,0,0,${0.18*a})`;ctx.beginPath();ctx.ellipse(h.x,h.y+26,22,6,0,0,7);ctx.fill();}
+  if(h.soft&&h.st!=='ground'){ctx.fillStyle='rgba(255,128,171,.25)';ctx.beginPath();ctx.arc(h.x,h.y,34+Math.sin(performance.now()/150)*3,0,7);ctx.fill();}
+  if(h.roll){ctx.save();ctx.translate(h.x,h.y);ctx.rotate(Math.sin(h.roll)*0.35);drawHeart(0,0,s,a);ctx.restore();}else drawHeart(h.x,h.y,s,a);
+  if(h.cage){ctx.strokeStyle='#90a4ae';ctx.lineWidth=3;rr(h.x-30,h.y-30,60,58,8);ctx.stroke();for(let k=-1;k<=1;k++){ctx.beginPath();ctx.moveTo(h.x+k*15,h.y-30);ctx.lineTo(h.x+k*15,h.y+28);ctx.stroke();}}}
+function catchHeart(ch){const h=ch.heart;h.st='caught';stats.hearts++;SFX.heart();if(ch.kind==='heart')lsSet(LS_HEARTDONE,1);
   if(hearts<MAX_HEARTS){hearts++;addScore(HEART_PTS,h.x,h.y-50,'Extra-Leben! ❤️','#ff80ab');}else addScore(HEART_MAX_PTS,h.x,h.y-50,'Herz-Bonus! ❤️','#ff80ab');
   for(let k=0;k<18;k++)parts.push({k:'dot',col:k%2?'#ff4081':'#ffcdd2',x:h.x,y:h.y,vx:rnd(-220,220),vy:rnd(-300,-40),life:0.8,t:0,s:rnd(4,8)});
   const hb=$('hearts');hb.classList.add('bump');clearTimeout(hb._t);hb._t=setTimeout(()=>hb.classList.remove('bump'),300);updateHud();}
@@ -632,7 +816,7 @@ function buildLevel(w,i){lvlPlanInfo=null;
   res(L.len-300,total);
   const ramps=[],zones=[],lasers=[],obstacles=[],challenges=[];
   /* Herausforderung (Tor / Herz-Käfig) in ein freies Stück ab st setzen: belegt [st, st+CH_WD] wie ein Hindernis */
-  const placeCh=(kind,st)=>{const T=CHAL_T[kind];const ch=T.make(st,challenges.filter(q=>q.kind===kind).length);T.flat(ch,flatten);challenges.push(ch);hardRes.push([st,st+T.wd]);};
+  const placeCh=(kind,st)=>{if(kind==='heart')kind=L.heartKind||'heart';const T=CHAL_T[kind];const ch=T.make(st,challenges.filter(q=>q.kind===kind).length);T.flat(ch,flatten);challenges.push(ch);hardRes.push([st,st+T.wd]);};
   if(w===0){
   /* Welt 1: Rampen wie bisher (gleiche Zufallsfolge, gleiche relative Lage) + ergänzte Rampen, Hindernisse jetzt mit dem Planer der neuen Welten */
   for(const r of L.ramps0.concat(L.rampsX)){const x=Math.round(r.f*L.len),len=r.len,ht=r.ht;flatten(x-80,x+len+40,140);
@@ -659,7 +843,7 @@ function buildLevel(w,i){lvlPlanInfo=null;
   fixed.sort((p,q)=>p[0]-q[0]);const segs=[];let cur=0;for(const [p0,p1] of fixed){if(p0>cur)segs.push([cur,p0]);cur=Math.max(cur,p1);}
   const items=[];for(let k=0;k<L.ramps;k++){const len=240+rng()*80;items.push({k:'ramp',len,ht:70+rng()*45,wd:len+RAMP_LAND+100});}
   for(let k=0;k<L.obst;k++)items.push({k:'obst',wd:520});for(let k=0;k<(L.lasers||0);k++)items.push({k:'laser',wd:600});
-  for(let k=0;k<(L.hearts||0);k++)items.push({k:'heart',wd:CH_WD.heart});for(let k=0;k<(L.gates||0);k++)items.push({k:'gate',wd:CH_WD.gate});
+  if(HEART_WD[L.heartKind]>0)for(let k=0;k<(L.hearts||0);k++)items.push({k:'heart',wd:HEART_WD[L.heartKind]});for(let k=0;k<(L.gates||0);k++)items.push({k:'gate',wd:CH_WD.gate});
   const Z=L.zones||{};for(const t of ['mud','river'])for(let k=0;k<(Z[t]||0);k++){const zlen=Math.round(t==='mud'?220+r2()*100:180+r2()*60);items.push({k:'zone',type:t,zlen,wd:zlen+300});}
   for(let k=items.length-1;k>0;k--){const j=Math.floor(rng()*(k+1));[items[k],items[j]]=[items[j],items[k]];}
   const F=segs.reduce((t,g)=>t+g[1]-g[0],0),need=items.reduce((t,it)=>t+it.wd,0),avgGap=Math.max(0,F-need)/(items.length+segs.length);
@@ -680,6 +864,7 @@ function buildLevel(w,i){lvlPlanInfo=null;
       else{const x0=Math.round(st+150);flatten(x0,x0+it.zlen,110);zones.push({x0,x1:x0+it.zlen,type:it.type,hinted:false});hardRes.push([x0-150,x0+it.zlen+150]);}
   }
   obstacles.sort((p,q)=>p.x-q.x);
+  if(L.heartKind==='ice'&&L.hearts){const rs=ramps.slice().sort((p,q)=>p.x-q.x);const r=rs[Math.floor((rs.length-1)/2)];if(r)challenges.push(CHAL_T.ice.make(r,h));}
   const zl={slip:[300,480],lake:[700,900],belt:[360,520]};
   for(const type of ['slip','lake','belt'])for(let n=0,g=0;n<(Z[type]||0)&&g<800;g++){const [za,zb]=zl[type];const zlen=Math.round(za+r2()*(zb-za));const x=Math.round(900+r2()*(L.len-2000));
     if(!hardRes.every(r=>x+zlen+140<r[0]||x-140>r[1])||!zones.every(z=>x+zlen+100<z.x0||x-100>z.x1))continue;if(type!=='slip')flatten(x,x+zlen,110);zones.push({x0:x,x1:x+zlen,type,hinted:false});n++;}
@@ -698,7 +883,7 @@ function showScreen(id){['sTitle','sWorld','sMap','sWerk','sSelect','sLevel','sE
   const playing=id===null;$('hud').classList.toggle('hidden',!playing);$('controls').classList.toggle('hidden',!playing);$('progress').classList.toggle('hidden',!playing);if(!playing)$('hint').classList.add('hidden');}
 function startRun(vi,startLevel=0,w=0){worldIdx=w|0;vehIdx=vi;veh=VEHICLES[vi];score=0;runId=Date.now();stats.jumps=stats.fires=stats.obst=stats.saltos=stats.wobbles=stats.gates=stats.cages=stats.hearts=stats.heartsMissed=0;landLog=[];startLevel=startLevel|0;startLevelPlay(startLevel);}
 function startLevelPlay(i){
-  levelIdx=i;markReached(worldIdx,i);refreshCos();lvl=buildLevel(worldIdx,i);theme=THEMES[lvl.L.theme];hearts=MAX_HEARTS;crashes=0;levelTime=0;maxX=0;lastCp=0;distAcc=0;levelStartScore=score;
+  levelIdx=i;markReached(worldIdx,i);refreshCos();lvl=buildLevel(worldIdx,i);initChallenges();theme=THEMES[lvl.L.theme];hearts=MAX_HEARTS;crashes=0;levelTime=0;maxX=0;lastCp=0;distAcc=0;levelStartScore=score;
   parts=[];water=[];pops=[];fireballs=[];hintT=0;blockedT=0;
   const BT=lvl.bossX?BOSS_T[WORLDS[worldIdx].boss]:null;
   boss=BT?{type:WORLDS[worldIdx].boss,BT,x:lvl.bossX,hp:BT.hp,maxHp:BT.hp,active:false,throwT:2.2,mouth:0,flash:0,defeated:false,fleeX:0,introT:0}:null;
@@ -805,6 +990,7 @@ const LEGACY_NEED=[16650,19260,20790,21600]; // 90 %-Ziele der Version 2.0 (vor 
 const LEGACY_NEED2=[24840,19260,20790,21600], LS_UNL_MIG3='dinoAutoSpiel.unlockMigrated.v3'; // 90 %-Ziele nach der Hindernis-Korrektur (vor den ergänzten Welt-1-Rampen)
 const LEGACY_NEED3=[26460,19260,20790,21600], LS_UNL_MIG4='dinoAutoSpiel.unlockMigrated.v4'; // 90 %-Ziele vor Sternen & Saltos (Version 2.2)
 const LEGACY_NEED4=[38790,27270,27900,29700], LS_UNL_MIG5='dinoAutoSpiel.unlockMigrated.v5'; // 90 %-Ziele vor Gitter-Toren & Herz-Käfigen (Version 2.3)
+const LEGACY_NEED5=[41760,30420,31590,33390], LS_UNL_MIG6='dinoAutoSpiel.unlockMigrated.v6'; // 90 %-Ziele vor den Welt-Herz-Maschinen (Version 2.4)
 /* ---- Sterne, Level-Bestwerte, erreichte Level, Endgegner-Siege ---- */
 const LS_STARS='dinoAutoSpiel.stars.v1', LS_LVBEST='dinoAutoSpiel.levelBest.v1', LS_REACH='dinoAutoSpiel.reached.v1', LS_BOSS='dinoAutoSpiel.bossWins.v1',
   LS_COS='dinoAutoSpiel.cosmetic.v1', LS_COSSEEN='dinoAutoSpiel.cosSeen.v1', LS_SALTO='dinoAutoSpiel.saltoDone.v1';
@@ -829,11 +1015,12 @@ function loadUnl(){try{const a=JSON.parse(localStorage.getItem(LS_UNL)||'[]');re
 function addUnl(w){const a=loadUnl();if(!a.includes(w)){a.push(w);a.sort();try{localStorage.setItem(LS_UNL,JSON.stringify(a));}catch(e){}}}
 /* Nach „Alles zurücksetzen“ darf keine alte Migration wieder etwas freischalten */
 const LS_RESET='dinoAutoSpiel.resetDone.v1';
-function migrateUnlocks(){try{if(localStorage.getItem(LS_RESET)){[LS_UNL_MIG,LS_UNL_MIG3,LS_UNL_MIG4,LS_UNL_MIG5].forEach(k=>localStorage.setItem(k,'1'));return;}const b=loadBest();
+function migrateUnlocks(){try{if(localStorage.getItem(LS_RESET)){[LS_UNL_MIG,LS_UNL_MIG3,LS_UNL_MIG4,LS_UNL_MIG5,LS_UNL_MIG6].forEach(k=>localStorage.setItem(k,'1'));return;}const b=loadBest();
   if(!localStorage.getItem(LS_UNL_MIG)){for(let w=1;w<WORLDS.length;w++)if(b[w-1]>=LEGACY_NEED[w-1])addUnl(w);localStorage.setItem(LS_UNL_MIG,'1');}
   if(!localStorage.getItem(LS_UNL_MIG3)){for(let w=1;w<WORLDS.length;w++)if(b[w-1]>=LEGACY_NEED2[w-1])addUnl(w);localStorage.setItem(LS_UNL_MIG3,'1');}
   if(!localStorage.getItem(LS_UNL_MIG4)){for(let w=1;w<WORLDS.length;w++)if(b[w-1]>=LEGACY_NEED3[w-1])addUnl(w);localStorage.setItem(LS_UNL_MIG4,'1');}
-  if(!localStorage.getItem(LS_UNL_MIG5)){for(let w=1;w<WORLDS.length;w++)if(b[w-1]>=LEGACY_NEED4[w-1])addUnl(w);localStorage.setItem(LS_UNL_MIG5,'1');}}catch(e){}}
+  if(!localStorage.getItem(LS_UNL_MIG5)){for(let w=1;w<WORLDS.length;w++)if(b[w-1]>=LEGACY_NEED4[w-1])addUnl(w);localStorage.setItem(LS_UNL_MIG5,'1');}
+  if(!localStorage.getItem(LS_UNL_MIG6)){for(let w=1;w<WORLDS.length;w++)if(b[w-1]>=LEGACY_NEED5[w-1])addUnl(w);localStorage.setItem(LS_UNL_MIG6,'1');}}catch(e){}}
 function isUnlocked(w,best){if(w===0)return true;if(loadUnl().includes(w))return true;best=best||loadBest();const ok=best[w-1]>=needPts(w-1)||starsIn(w-1)>=STAR_NEED;if(ok)addUnl(w);return ok;}
 function updateBest(){const b0=loadBest();const before=WORLDS.map((_,w)=>isUnlocked(w,b0));const b=b0.slice();if(Math.round(score)>b[worldIdx]){b[worldIdx]=Math.round(score);saveBest(b);}
   return WORLDS.findIndex((_,w)=>!before[w]&&isUnlocked(w,b));}
@@ -983,14 +1170,15 @@ function update(dt){
   // water
   const tgt=aimTarget();c.spraying=!!tgt;setSpray(c.spraying);
   if(tgt){const n=nozzlePos();let ang=tgt.pt?solveAim(n,tgt.pt):-0.42;c.aimAng=ang;sprayAcc+=dt*veh.rate;
-    while(sprayAcc>=1){sprayAcc--;const a=ang+rnd(-0.035,0.035),sp=WSPEED*rnd(0.97,1.03);water.push({x:n.x,y:n.y,vx:Math.cos(a)*sp+c.vx*0.2,vy:Math.sin(a)*sp,life:2.2});}}
+    while(sprayAcc>=1){sprayAcc--;const a=ang+rnd(-0.035,0.035),sp=WSPEED*rnd(0.97,1.03);water.push({x:n.x,y:n.y,vx:Math.cos(a)*sp+c.vx*0.2,vy:Math.sin(a)*sp,life:2.2,rj:!c.onGround&&c.rampJump?c.rampEnd:null});}}
   for(let i=water.length-1;i>=0;i--){const p=water[i];p.vy+=WG*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;let dead=p.life<=0;
     if(!dead)for(const f of lvl.fires){if(f.out)continue;const gy=groundY(f.x);if(Math.abs(p.x-f.x)<f.w/2+40&&p.y>gy-f.h*fireScale(f)-50&&p.y<gy+10){
       f.hp-=veh.dmg;dead=true;SFX.hiss();if(Math.random()<0.5)parts.push({k:'steam',x:p.x,y:p.y,vx:rnd(-30,30),vy:rnd(-120,-50),life:rnd(0.6,1.2),t:0,s:rnd(10,20)});if(f.hp<=0)extinguish(f);break;}}
     if(!dead)for(let j=fireballs.length-1;j>=0;j--){const b=fireballs[j];if(Math.hypot(p.x-b.x,p.y-b.y)<48){b.hp-=veh.dmg;dead=true;SFX.hiss();if(b.hp<=0){fireballs.splice(j,1);addScore(25,b.x,b.y-30,'');SFX.fireOut();for(let k=0;k<12;k++)parts.push({k:'steam',x:b.x,y:b.y,vx:rnd(-80,80),vy:rnd(-100,0),life:1,t:0,s:rnd(10,22)});}break;}}
     if(!dead&&boss&&boss.active&&!boss.defeated){const by=groundY(boss.x);if(p.x>boss.x-150&&p.x<boss.x+150&&p.y>by-300&&p.y<by){dead=true;boss.hp-=veh.dmg;boss.flash=0.12;SFX.hiss();
       if(Math.random()<0.4)parts.push({k:'steam',x:p.x,y:p.y,vx:rnd(-30,30),vy:rnd(-120,-50),life:1,t:0,s:rnd(10,20)});if(boss.hp<=0)defeatBoss();}}
-    if(!dead)for(const ch of lvl.challenges){const tr=ch.trig;if(!tr.done&&trigHit(tr,p)){dead=true;SFX.hiss();trigFeed(ch,veh.dmg/58);
+    if(!dead)for(const ch of lvl.challenges){const tr=ch.trig;if(!tr.done&&trigHit(tr,p)){dead=true;const TT=TRIG_T[tr.type],m=TT.mult?TT.mult(ch,c,p):1;
+      if(m>0){SFX.hiss();trigFeed(ch,veh.dmg/58*m);}else if(CHAL_T[ch.kind].refuse)CHAL_T[ch.kind].refuse(ch);
       if(Math.random()<0.35)parts.push({k:'drop',x:p.x,y:p.y,vx:rnd(-90,90),vy:rnd(-160,-40),life:0.5,t:0,s:3});break;}}
     if(!dead&&p.y>groundY(p.x)){dead=true;if(Math.random()<0.3)parts.push({k:'drop',x:p.x,y:groundY(p.x),vx:rnd(-60,60),vy:rnd(-150,-60),life:0.4,t:0,s:3});}
     if(dead)water.splice(i,1);}
@@ -1038,7 +1226,10 @@ function render(){
   ctx.setTransform(dpr*scale,0,0,dpr*scale,0,0);
   if(!lvl){drawMenuBg();return;}
   const c=car;
-  let tx=c.x-W*0.3+clamp(c.vx,0,500)*0.25;const ty=Math.min(c.y-H*0.62,BASE-H*0.72+60);
+  let tx=c.x-W*0.3+clamp(c.vx,0,500)*0.25;
+  /* hoch hängendes Herz (Geysir / Blatt) in Sicht: Kamera etwas höher, damit man das Herz sieht */
+  const hiNear=lvl.challenges.some(ch=>ch.heart&&ch.heart.st==='hang'&&ch.x-c.x<W*0.8&&ch.x-c.x>-250);camLift=lerp(camLift,hiNear?CAM_LIFT:0,0.05);
+  const ty=Math.min(c.y-H*0.62,BASE-H*0.72+60)-camLift;
   if(boss&&boss.active&&!boss.defeated)tx=Math.max(tx,Math.min(boss.x+240-W,c.x-90));
   camX=lerp(camX,tx,0.12);camY=lerp(camY,ty,0.08);
   drawSky();
@@ -1073,6 +1264,12 @@ function render(){
     const y=p.y-p.t*70;ctx.globalAlpha=a;ctx.lineWidth=7;ctx.strokeStyle='#4e342e';ctx.strokeText(p.text,p.x,y);ctx.fillStyle=p.color;ctx.fillText(p.text,p.x,y);ctx.globalAlpha=1;}
   ctx.restore();
   drawAmbientFront();
+  /* Ziel oben außerhalb des Bildes (Eisblock, hängendes Herz): kleiner hüpfender Pfeil am oberen Rand */
+  for(const ch of lvl.challenges){let q=null;if(ch.kind==='ice'&&!ch.open)q=trigPos(ch.trig);else if(ch.heart&&ch.heart.st==='hang')q=ch.heart;if(!q)continue;
+    const sx=q.x-camX,sy=q.y-camY;if(sy>-10||sx<20||sx>W-20)continue;const b=Math.sin(performance.now()/160)*5,yy=92+b;
+    ctx.fillStyle='rgba(255,255,255,.85)';ctx.beginPath();ctx.arc(sx,yy,22,0,7);ctx.fill();ctx.strokeStyle=ch.kind==='ice'?'#29b6f6':'#e53935';ctx.lineWidth=3;ctx.stroke();
+    ctx.fillStyle=ch.kind==='ice'?'#29b6f6':'#e53935';ctx.beginPath();ctx.moveTo(sx,yy-38);ctx.lineTo(sx-10,yy-24);ctx.lineTo(sx+10,yy-24);ctx.fill();
+    if(ch.kind==='ice'){ctx.fillStyle='rgba(179,229,252,.9)';rr(sx-13,yy-13,26,26,5);ctx.fill();drawHeart(sx,yy+1,8);}else drawHeart(sx,yy+1,11);}
   if(boss&&boss.active&&!boss.defeated){const bw=Math.min(420,W*0.4),bx=W/2-bw/2,by=H-40;ctx.fillStyle='#0008';rr(bx-4,by-4,bw+8,26,12);ctx.fill();ctx.fillStyle='#ff5722';rr(bx,by,bw*clamp(boss.hp/boss.maxHp,0,1),18,9);ctx.fill();
     ctx.font='bold 18px sans-serif';ctx.fillStyle='#fff';ctx.textAlign='center';ctx.fillText(boss.BT.label,W/2,by-10);}
 }
@@ -1500,7 +1697,7 @@ function confirmBox(text,yes,no,o){o=o||{};$('cfText').textContent=text;$('cfYes
 const RESET_KEEP=[LS_MUSIC,LS_NAME];
 function resetAll(){try{const ks=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith('dinoAutoSpiel.')&&!RESET_KEEP.includes(k))ks.push(k);}
   ks.forEach(k=>localStorage.removeItem(k));
-  [LS_UNL_MIG,LS_UNL_MIG3,LS_UNL_MIG4,LS_UNL_MIG5].forEach(k=>localStorage.setItem(k,'1'));localStorage.setItem(LS_RESET,String(Date.now()));}catch(e){}
+  [LS_UNL_MIG,LS_UNL_MIG3,LS_UNL_MIG4,LS_UNL_MIG5,LS_UNL_MIG6].forEach(k=>localStorage.setItem(k,'1'));localStorage.setItem(LS_RESET,String(Date.now()));}catch(e){}
   worldIdx=0;levelIdx=0;mapLevel=0;lvl=null;refreshCos();return true;}
 function setSetMusic(){$('btnSetMusic').textContent=musicOn?'🎵 An':'🔇 Aus';$('btnSetMusic').className='btn '+(musicOn?'blue':'gray');}
 function showSettings(){setSetMusic();showScreen('sSettings');}
@@ -1518,7 +1715,8 @@ $('btnReset').onclick=()=>{SFX.click();
 if(TEST){window.__game={get crashLog(){return crashLog},get levelTime(){return levelTime},get worldIdx(){return worldIdx},WORLDS,WORLD_MAX,loadBest,saveBest,isUnlocked,loadUnl,migrateUnlocks,needPts,laserOn,zoneAt,buildWorlds,starMask,levelStars,starsIn,totalStars,saveStars,levelBest,reachedLevel,bossWins,HATS,PAINTS,cosUnlocked,loadCos,saveCos,newCosmetics,showMap,showWerk,werkPick,get drawCos(){return drawCos},get lastStars(){return lastStars},get landLog(){return landLog},STAR_NEED,RAMP_LAND,resetAll,showSettings,get musicOn(){return musicOn},FLIP_T,SALTO_PTS,wrapAng,get mapLevel(){return mapLevel},get state(){return state},get car(){return car},get lvl(){return lvl},get boss(){return boss},get score(){return score},set score(v){score=v},get hearts(){return hearts},get levelIdx(){return levelIdx},
   get fireballs(){return fireballs},input,startRun,startLevelPlay,update,loadHs,stats,endRun,qualifies,crash,
   setManual(m){manual=m},step(sec,ctl){const n=Math.round(sec*60);for(let i=0;i<n;i++){if(ctl)ctl();update(1/60);if(state!=='play')return i;}return n;},
-  get challenges(){return lvl?lvl.challenges:[]},CHAL_T,TRIG_T,CH_GATES,CH_HEARTS,MAX_HEARTS,HEART_LINGER,HEART_FADE,GATE_PTS,CAGE_PTS,HEART_PTS,HEART_MAX_PTS,trigFeed,trigPos,
+  get challenges(){return lvl?lvl.challenges:[]},CHAL_T,TRIG_T,CH_GATES,CH_HEARTS,CH_SPECIAL,SPECIAL_KIND,HEART_WD,HEART_SOFT,LS_CHDONE,initChallenges,
+  GEYSER:{HX:GEYSER_HX,HY:GEYSER_HY,V:GEYSER_V,T:GEYSER_T,W:GEYSER_W},ICE:{DX:ICE_DX,H:ICE_H},LEAF:{HX:LEAF_HX,HY:LEAF_HY,V:LEAF_V,W:LEAF_W},MAX_HEARTS,HEART_LINGER,HEART_FADE,GATE_PTS,CAGE_PTS,HEART_PTS,HEART_MAX_PTS,trigFeed,trigPos,
   set hearts(v){hearts=v;updateHud();},get veh(){return veh},get lastCp(){return lastCp},get hint(){return hintT>0?$('hint').textContent:''},
   teleport(x){car.x=x;car.y=groundY(x);car.vx=0;car.vy=0;car.onGround=true;maxX=Math.max(maxX,x);camX=x-W*0.3;camY=car.y-H*0.62;},groundY};}
 </script>
